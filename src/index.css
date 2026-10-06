@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #f3efe6;
+  --color-surface: #fffdf8;
+  --color-ink: #1f1a14;
+  --color-muted: #6f655a;
+  --color-line: #e5dccf;
+  --color-accent: #1f6b52;
+  --color-accent-soft: #e5f3ec;
+  --font-sans: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Avenir Next", system-ui, sans-serif;
+}
+
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  min-height: 100dvh;
+}
+
+input,
+textarea,
+select {
+  font-size: 16px;
+}
