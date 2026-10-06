@@ -7,6 +7,7 @@ export interface ItemInput {
   location: string
   note: string
   photo: string | null
+  category: string
 }
 
 export interface Item extends ItemInput {
@@ -33,4 +34,5 @@ export const emptyInput: ItemInput = {
   location: '',
   note: '',
   photo: null,
+  category: 'home',
 }

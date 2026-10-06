@@ -1,14 +1,15 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #f3efe6;
-  --color-surface: #fffdf8;
-  --color-ink: #1f1a14;
-  --color-muted: #6f655a;
-  --color-line: #e5dccf;
-  --color-accent: #1f6b52;
-  --color-accent-soft: #e5f3ec;
+  --color-bg: #f7ead8;
+  --color-surface: #fffaf3;
+  --color-ink: #1c140c;
+  --color-muted: #6e5a48;
+  --color-line: #edd9bc;
+  --color-accent: #e25c2b;
+  --color-accent-soft: #ffe4d4;
   --font-sans: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Avenir Next", system-ui, sans-serif;
+  --font-display: "Fredoka", "PingFang SC", "Hiragino Sans GB", sans-serif;
 }
 
 html,
@@ -16,6 +17,12 @@ body {
   background: var(--color-bg);
   color: var(--color-ink);
   -webkit-tap-highlight-color: transparent;
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
 }
 
 body {
@@ -26,4 +33,49 @@ input,
 textarea,
 select {
   font-size: 16px;
+}
+
+.chip-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+
+.chip-row::-webkit-scrollbar {
+  display: none;
+}
+
+.bg-dot {
+  position: absolute;
+  border-radius: 999px;
+  opacity: 0.55;
+  animation: float-dot 16s ease-in-out infinite;
+}
+
+.brand-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #e25c2b;
+  text-shadow:
+    0 2px 0 #ffe4d4,
+    0 3px 10px rgba(226, 92, 43, 0.18);
+}
+
+@keyframes float-dot {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(12px, -18px) scale(1.12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bg-dot {
+    animation: none;
+  }
 }
