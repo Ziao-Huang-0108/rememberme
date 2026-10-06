@@ -25,8 +25,7 @@ type Screen = { name: 'list' } | { name: 'form'; item?: Item }
 
 export default function App() {
   const today = useToday()
-  const { user, loading: authLoading, error: authError, nicknameHint, signInWithNickname, signInWithWechat, signOut } =
-    useAuth()
+  const { user, loading: authLoading, error: authError, usernameHint, signIn, signUp, signOut } = useAuth()
   const [household, setHousehold] = useState<Household | null>(null)
   const [memberNames, setMemberNames] = useState<Record<string, string>>({})
   const [houseLoading, setHouseLoading] = useState(false)
@@ -88,21 +87,11 @@ export default function App() {
           <BackgroundDots />
           <SongPlayer />
           <LoginPage
-            nicknameHint={nicknameHint}
+            usernameHint={usernameHint}
             error={authError}
-            onNicknameLogin={signInWithNickname}
-            onWechatLogin={signInWithWechat}
+            onSignIn={signIn}
+            onSignUp={signUp}
           />
-          <button
-            type="button"
-            className="fixed bottom-4 left-1/2 z-30 -translate-x-1/2 text-xs text-muted underline"
-            onClick={() => {
-              localStorage.setItem('remember-me:force-local', '1')
-              setForceLocal(true)
-            }}
-          >
-            暂时只用本机（不同步）
-          </button>
         </>
       )
     }

@@ -4,31 +4,42 @@ import { auth, authErrorMessage, cloudReady } from '../lib/cloudbase'
 export interface AuthUser {
   id: string
   nickname: string
-  isAnonymous: boolean
+  username: string
 }
 
 function mapUser(user: {
   uid?: string
-  sub?: string
   id?: string
-  is_anonymous?: boolean
+  username?: string
   name?: string
   nickName?: string
-  username?: string
-  user_metadata?: { name?: string; nickName?: string; username?: string }
+  nickname?: string
+  user_metadata?: { name?: string; nickName?: string; nickname?: string; username?: string }
 } | null): AuthUser | null {
   if (!user) return null
-  const id = user.uid || user.sub || user.id
+  const id = user.uid || user.id
   if (!id) return null
+  const username = user.username || user.user_metadata?.username || ''
   const nickname =
+    user.nickname ||
     user.nickName ||
     user.name ||
-    user.username ||
+    user.user_metadata?.nickname ||
     user.user_metadata?.nickName ||
     user.user_metadata?.name ||
-    user.user_metadata?.username ||
+    username ||
     '家人'
-  return { id, nickname, isAnonymous: Boolean(user.is_anonymous) }
+  return { id, nickname, username }
+}
+
+function validateUsername(username: string) {
+  if (!/^[A-Za-z][A-Za-z0-9_-]{2,23}$/.test(username)) {
+    throw new Error('用户名请用英文开头，3～24 位，可含数字、下划线、横线，不要用中文')
+  }
+}
+
+function validatePassword(password: string) {
+  if (password.length < 6) throw new Error('密码至少 6 位')
 }
 
 export function useAuth() {
@@ -56,51 +67,87 @@ export function useAuth() {
 
   useEffect(() => {
     refresh()
-    const sub = auth.onAuthStateChange(() => {
-      void refresh()
-    })
-    return () => {
-      sub.data.subscription.unsubscribe()
-    }
-  }, [refresh])
-
-  const signInWithNickname = useCallback(async (nickname: string) => {
-    setError(null)
-    const name = nickname.trim()
-    if (!name) throw new Error('请先写一个称呼，比如「妈妈」')
-    const { error: anonError } = await auth.signInAnonymously({})
-    if (anonError) throw new Error(authErrorMessage(anonError))
     try {
-      await auth.updateUserBasicInfo({ nickname: name })
-    } catch {
-      try {
-        await auth.updateUser({ nickname: name })
-      } catch {
-        /* 昵称写进家庭成员表也行 */
+      const sub = auth.onAuthStateChange(() => {
+        void refresh()
+      })
+      return () => {
+        sub.data.subscription.unsubscribe()
       }
+    } catch {
+      return undefined
     }
-    localStorage.setItem('remember-me:nickname', name)
-    await refresh()
   }, [refresh])
 
-  const signInWithWechat = useCallback(async () => {
-    setError(null)
-    const redirectTo = `${window.location.origin}/`
-    const { data, error: oauthError } = await auth.signInWithOAuth({
-      provider: 'wechat',
-      options: { redirectTo },
-    })
-    if (oauthError) throw new Error(authErrorMessage(oauthError))
-    if (data?.url) {
-      window.location.href = data.url
-      return
-    }
-    throw new Error('微信登录还没在 CloudBase 控制台开通，或开放平台还没配好。')
-  }, [])
+  const signIn = useCallback(
+    async (username: string, password: string) => {
+      setError(null)
+      const u = username.trim()
+      if (!u || !password) throw new Error('请填写用户名和密码')
+      const { error: loginError } = await auth.signInWithPassword({ username: u, password })
+      if (loginError) {
+        // 兼容旧接口
+        try {
+          await auth.signIn({ username: u, password })
+        } catch (e) {
+          throw new Error(authErrorMessage(loginError) || authErrorMessage(e) || '用户名或密码不对')
+        }
+      }
+      localStorage.setItem('remember-me:username', u)
+      await refresh()
+    },
+    [refresh],
+  )
+
+  const signUp = useCallback(
+    async (username: string, password: string, nickname: string) => {
+      setError(null)
+      const u = username.trim()
+      const nick = nickname.trim() || u
+      validateUsername(u)
+      validatePassword(password)
+
+      const result = await auth.signUp({
+        username: u,
+        password,
+        name: nick,
+      })
+
+      if (result && 'error' in result && result.error) {
+        const msg = authErrorMessage(result.error)
+        if (/username|用户名|password|密码|not allow|不允许|just by/i.test(msg)) {
+          throw new Error(
+            '腾讯云不允许网页上直接用「用户名+密码」注册。请打开 CloudBase 控制台 → 用户管理 → 添加用户，给家人建好账号后，再用这个页面登录。',
+          )
+        }
+        throw new Error(msg)
+      }
+
+      // 有的版本 signUp 不会自动登录
+      try {
+        await auth.signInWithPassword({ username: u, password })
+      } catch {
+        try {
+          await auth.signIn({ username: u, password })
+        } catch {
+          /* signUp 已自动登录时忽略 */
+        }
+      }
+
+      try {
+        await auth.updateUserBasicInfo({ nickname: nick })
+      } catch {
+        /* 称呼会写进家庭成员表 */
+      }
+      localStorage.setItem('remember-me:username', u)
+      localStorage.setItem('remember-me:nickname', nick)
+      await refresh()
+    },
+    [refresh],
+  )
 
   const signOut = useCallback(async () => {
     await auth.signOut()
-    localStorage.removeItem('remember-me:nickname')
     await refresh()
   }, [refresh])
 
@@ -108,9 +155,9 @@ export function useAuth() {
     user,
     loading,
     error,
-    nicknameHint: localStorage.getItem('remember-me:nickname') || '',
-    signInWithNickname,
-    signInWithWechat,
+    usernameHint: localStorage.getItem('remember-me:username') || '',
+    signIn,
+    signUp,
     signOut,
     refresh,
   }

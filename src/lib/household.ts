@@ -1,4 +1,4 @@
-import { auth, db } from './cloudbase'
+import { auth, rdb, throwIfDbError } from './cloudbase'
 
 export interface Household {
   id: string
@@ -32,6 +32,15 @@ function inviteCode(): string {
   return code
 }
 
+function mapHousehold(row: Record<string, unknown>): Household {
+  return {
+    id: String(row.id),
+    name: String(row.name || '我们家'),
+    inviteCode: String(row.invite_code || ''),
+    createdBy: String(row.created_by || ''),
+  }
+}
+
 export async function currentUserId(): Promise<string | null> {
   const user = await auth.getCurrentUser()
   if (!user) return null
@@ -43,22 +52,30 @@ export async function createHousehold(name: string, nickname: string): Promise<H
   if (!userId) throw new Error('请先登录')
   const trimmed = name.trim() || '我们家'
   const code = inviteCode()
-  const now = new Date().toISOString()
-  const houseRes = await db.collection('households').add({
-    name: trimmed,
-    inviteCode: code,
-    createdBy: userId,
-    createdAt: now,
-  })
-  const householdId = (houseRes as { id: string }).id
-  await db.collection('members').add({
-    householdId,
-    userId,
+
+  const { data, error } = await rdb
+    .from('households')
+    .insert({
+      name: trimmed,
+      invite_code: code,
+      created_by: userId,
+    })
+    .select()
+  throwIfDbError(error, '创建家庭失败')
+
+  const row = (data as Array<Record<string, unknown>> | null)?.[0]
+  if (!row?.id) throw new Error('创建家庭失败，没有返回家庭编号')
+  const householdId = String(row.id)
+
+  const { error: memError } = await rdb.from('members').insert({
+    household_id: householdId,
+    user_id: userId,
     nickname: nickname.trim() || '家人',
-    createdAt: now,
   })
+  throwIfDbError(memError, '加入家庭成员失败')
+
   setCachedHouseholdId(householdId)
-  return { id: householdId, name: trimmed, inviteCode: code, createdBy: userId }
+  return mapHousehold(row)
 }
 
 export async function joinHousehold(code: string, nickname: string): Promise<Household> {
@@ -67,48 +84,48 @@ export async function joinHousehold(code: string, nickname: string): Promise<Hou
   const normalized = code.trim().toUpperCase()
   if (!normalized) throw new Error('请填写邀请码')
 
-  const found = await db.collection('households').where({ inviteCode: normalized }).limit(1).get()
-  const doc = (found.data as Array<Record<string, unknown>>)[0]
-  if (!doc) throw new Error('邀请码不对，请再核对一下')
+  const { data, error } = await rdb.from('households').select().eq('invite_code', normalized).limit(1)
+  throwIfDbError(error, '查找邀请码失败')
+  const row = (data as Array<Record<string, unknown>> | null)?.[0]
+  if (!row) throw new Error('邀请码不对，请再核对一下')
 
-  const householdId = String(doc._id)
-  const existing = await db.collection('members').where({ householdId, userId }).limit(1).get()
-  if ((existing.data as unknown[]).length === 0) {
-    await db.collection('members').add({
-      householdId,
-      userId,
+  const householdId = String(row.id)
+  const { data: existing, error: existError } = await rdb
+    .from('members')
+    .select('id')
+    .eq('household_id', householdId)
+    .eq('user_id', userId)
+    .limit(1)
+  throwIfDbError(existError)
+
+  if (!(existing as unknown[] | null)?.length) {
+    const { error: memError } = await rdb.from('members').insert({
+      household_id: householdId,
+      user_id: userId,
       nickname: nickname.trim() || '家人',
-      createdAt: new Date().toISOString(),
     })
+    throwIfDbError(memError, '加入家庭失败')
   }
+
   setCachedHouseholdId(householdId)
-  return {
-    id: householdId,
-    name: String(doc.name || '我们家'),
-    inviteCode: String(doc.inviteCode || normalized),
-    createdBy: String(doc.createdBy || ''),
-  }
+  return mapHousehold(row)
 }
 
 export async function loadHousehold(householdId: string): Promise<Household | null> {
-  const res = await db.collection('households').doc(householdId).get()
-  const doc = (res.data as Array<Record<string, unknown>>)[0]
-  if (!doc) return null
-  return {
-    id: String(doc._id),
-    name: String(doc.name || '我们家'),
-    inviteCode: String(doc.inviteCode || ''),
-    createdBy: String(doc.createdBy || ''),
-  }
+  const { data, error } = await rdb.from('households').select().eq('id', householdId).limit(1)
+  throwIfDbError(error)
+  const row = (data as Array<Record<string, unknown>> | null)?.[0]
+  return row ? mapHousehold(row) : null
 }
 
 export async function listMembers(householdId: string): Promise<Member[]> {
-  const res = await db.collection('members').where({ householdId }).get()
-  return (res.data as Array<Record<string, unknown>>).map((doc) => ({
-    id: String(doc._id),
-    householdId: String(doc.householdId),
-    userId: String(doc.userId),
-    nickname: String(doc.nickname || '家人'),
+  const { data, error } = await rdb.from('members').select().eq('household_id', householdId)
+  throwIfDbError(error)
+  return ((data as Array<Record<string, unknown>>) || []).map((row) => ({
+    id: String(row.id),
+    householdId: String(row.household_id),
+    userId: String(row.user_id),
+    nickname: String(row.nickname || '家人'),
   }))
 }
 
@@ -120,10 +137,11 @@ export async function findMyHousehold(): Promise<Household | null> {
   }
   const userId = await currentUserId()
   if (!userId) return null
-  const mem = await db.collection('members').where({ userId }).limit(1).get()
-  const first = (mem.data as Array<Record<string, unknown>>)[0]
+  const { data, error } = await rdb.from('members').select().eq('user_id', userId).limit(1)
+  throwIfDbError(error)
+  const first = (data as Array<Record<string, unknown>> | null)?.[0]
   if (!first) return null
-  const householdId = String(first.householdId)
+  const householdId = String(first.household_id)
   setCachedHouseholdId(householdId)
   return loadHousehold(householdId)
 }
