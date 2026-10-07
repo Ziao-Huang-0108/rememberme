@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { auth, authErrorMessage, cloudReady } from '../lib/cloudbase'
+import { rememberUsername } from '../lib/rememberedUsernames'
 
 export interface AuthUser {
   id: string
@@ -82,7 +83,7 @@ export function useAuth() {
           throw new Error(authErrorMessage(loginError) || authErrorMessage(e) || '用户名或密码不对')
         }
       }
-      localStorage.setItem('remember-me:username', u)
+      rememberUsername(u)
       await refresh()
     },
     [refresh],
