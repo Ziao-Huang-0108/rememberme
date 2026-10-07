@@ -25,7 +25,7 @@ type Screen = { name: 'list' } | { name: 'form'; item?: Item }
 
 export default function App() {
   const today = useToday()
-  const { user, loading: authLoading, error: authError, usernameHint, signIn, signUp, signOut } = useAuth()
+  const { user, loading: authLoading, error: authError, usernameHint, signIn, signOut } = useAuth()
   const [household, setHousehold] = useState<Household | null>(null)
   const [memberNames, setMemberNames] = useState<Record<string, string>>({})
   const [houseLoading, setHouseLoading] = useState(false)
@@ -86,12 +86,7 @@ export default function App() {
         <>
           <BackgroundDots />
           <SongPlayer />
-          <LoginPage
-            usernameHint={usernameHint}
-            error={authError}
-            onSignIn={signIn}
-            onSignUp={signUp}
-          />
+          <LoginPage usernameHint={usernameHint} error={authError} onSignIn={signIn} />
         </>
       )
     }
