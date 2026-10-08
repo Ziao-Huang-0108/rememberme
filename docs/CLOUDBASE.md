@@ -3,19 +3,20 @@
 环境 ID：`remember-me-d1gmd5iiu9d88c58a`（上海）
 
 登录：**用户名 + 密码**  
-数据：**SQL 型数据库（PostgreSQL）**
+数据：**SQL 型数据库（PostgreSQL）**  
+前端上线：**CloudBase 静态网站托管**（国内更稳；不依赖 Vercel）
 
-## 1. 安全域名（本地多半不用动）
+## 1. 安全域名 / 安全来源
 
-官方文档里，环境一般**已经默认带了** `localhost`（本地调试用）。  
-所以你在控制台找不到「环境配置 → 安全配置」时，**先跳过这一步**，直接去做登录和本地试用。
+本地 `localhost` 一般已默认放行。
 
-如果以后打开网页时报「跨域 / CORS / 非法来源 / safe domain」之类错误，再去找：
+CloudBase **静态托管的默认域名**（例如 `remember-me-d1gmd5iiu9d88c58a.tcloudbaseapp.com`）通常也已在白名单里，所以换到静态托管后，多数情况**不用再买「跨域域名」套餐**。 若登录仍报 `Failed to fetch` / `Load failed`，再打开：
 
-- 云开发平台 → **环境配置 → 安全来源**（有的界面叫「安全域名」）
-- 需要时再加：`localhost`、`localhost:5173`、`127.0.0.1`（Vite 默认端口是 5173）
+[https://tcb.cloud.tencent.com/dev?envId=remember-me-d1gmd5iiu9d88c58a#/env/safety-source](https://tcb.cloud.tencent.com/dev?envId=remember-me-d1gmd5iiu9d88c58a#/env/safety-source)
 
-说明：PostgreSQL（PostgREST）并不等于「完全不用安全域名」。网页用的还是 CloudBase JS SDK，域名白名单仍可能生效；只是本地 `localhost` 通常已默认放行。
+把当前网页域名加上（不要带 `https://`）。
+
+> 以前用的 Vercel（`rememberme-chi.vercel.app`）在国内不稳定，且加白名单可能要付费套餐，所以前端改走 CloudBase 托管。
 
 ## 2. 打开用户名密码登录
 
@@ -24,19 +25,13 @@
 
 家人账号：在 **用户管理** 里手动添加。网页上只有登录，没有注册——腾讯云不允许前端直接「用户名+密码」自助开号。
 
-## 3. 建三张表（就在你现在这个 SQL 编辑器）
+## 3. 建三张表
 
-1. 打开 **SQL 型数据库 → 数据管理 → SQL 编辑器**（就是你截图的页面）
-2. 打开项目里的文件：`cloudbase/schema.sql`
-3. **整份复制**进编辑器  
-   - 如果编辑器提示「SQL 里避免带注释」，我们这份本身几乎没有说明注释；若仍报错，就一段一段执行（先建表，再策略）
-4. 点右下角 **执行**（或 `⌘ + Enter`）
-5. 再到左侧 **数据库管理 → 表**，应能看到：
-   - `households`
-   - `members`
-   - `items`
+1. 打开 **SQL 型数据库 → 数据管理 → SQL 编辑器**
+2. 打开项目里的 `cloudbase/schema.sql`，整份复制执行
+3. 左侧 **表** 里应能看到 `households` / `members` / `items`
 
-如果某句报错「policy / role authenticated 不存在」，把报错原文发给我，我帮你改一版更贴你环境的权限语句。
+
 
 ## 4. 本地打开
 
@@ -46,17 +41,70 @@ npm run dev
 
 登录 → 创建家庭或输入邀请码 → 记东西。
 
-## 5. 上线给家人用（Vercel）
+## 5. 上线给家人用（CloudBase 静态托管）——推荐
 
-1. 把代码推到 GitHub（当前仓库即可）
-2. 打开 [vercel.com](https://vercel.com) → Import 这个仓库 → Framework 选 Vite
-3. 环境变量填上（和本地 `.env` 一样）：
-   - `VITE_CLOUDBASE_ENV` = 你的环境 ID
-   - `VITE_CLOUDBASE_REGION` = `ap-shanghai`
-4. Deploy 完成后，复制线上域名（例如 `xxx.vercel.app`）
-5. 回到 CloudBase → **环境配置 → 安全来源**，把这个域名加进去（不要带 `https://`）
-6. 给每位家人在「用户管理」建好账号，把链接和账号发给他们
 
-手机浏览器打开后，可「添加到主屏幕」，像 App 一样用（PWA）。
 
-若国内访问 Vercel 很慢，可改用 CloudBase **静态网站托管**：把 `npm run build` 生成的 `dist/` 上传上去，同样要把托管域名加进安全来源。
+### 5.1 本机构建
+
+项目根目录（确保本地有 `.env`，里面是环境 ID）：
+
+```bash
+npm run build
+```
+
+成功后会有 `dist/` 文件夹。也可再执行：
+
+```bash
+npm run pack:hosting
+```
+
+会生成 `remember-me-hosting.zip`，方便在控制台上传。
+
+### 5.2 控制台上传（最省事）
+
+1. 打开云开发平台 → 你的环境 → **静态网站托管**
+2. 若尚未开通，按提示开通
+3. 用下面任一方式部署：
+  - **文件管理 / 上传文件**：把 `dist/` 里的内容上传到根目录（注意是 `dist` 里面的文件，不要多一层 `dist` 文件夹）
+  - 或 **新建部署 → 上传代码包**：上传 `remember-me-hosting.zip`；若让平台构建，框架选 Vite，产物目录 `dist`，并配置环境变量（见下）
+4. **SPA / 单页应用**：把「错误文档」或「404 页面」设为 `index.html`（刷新才不会空白）
+5. 打开控制台给出的默认访问地址（一般是
+  `https://remember-me-d1gmd5iiu9d88c58a.tcloudbaseapp.com`  
+   以控制台显示为准）
+
+
+
+### 5.3 若选择「上传源码让云端构建」
+
+环境变量填：
+
+- `VITE_CLOUDBASE_ENV` = `remember-me-d1gmd5iiu9d88c58a`
+- `VITE_CLOUDBASE_REGION` = `ap-shanghai`
+
+构建命令：`npm run build`  
+产物目录：`dist`
+
+### 5.4 本机 CLI 部署（可选）
+
+```bash
+npm i -g @cloudbase/cli
+tcb login
+npm run build
+tcb hosting deploy dist -e remember-me-d1gmd5iiu9d88c58a
+```
+
+
+
+### 5.5 发给家人
+
+1. 用手机打开静态托管域名，登录试一下
+2. 给家人在「用户管理」建好账号
+3. 把链接 + 账号密码 + 家庭邀请码发给他们
+4. 手机浏览器可「添加到主屏幕」当 App 用
+
+
+
+## 6. 以前的 Vercel（可选备份）
+
+仓库里仍有 `vercel.json`，需要时还能部署。家人请优先用 CloudBase 托管链接。

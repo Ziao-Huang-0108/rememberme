@@ -24,8 +24,9 @@ export function authErrorMessage(error: unknown): string {
   if (!error) return '出了点问题，请再试一次'
   if (typeof error === 'object' && error && 'message' in error) {
     const msg = String((error as { message?: string }).message || '')
-    if (/safe|domain|来源|origin|cors/i.test(msg)) {
-      return '网页域名还没加到 CloudBase 安全域名里。请在控制台加上 localhost，等几分钟再试。'
+    if (/failed to fetch|load failed|networkerror|cors|safe|domain|来源|origin/i.test(msg)) {
+      const host = typeof window !== 'undefined' ? window.location.host : '当前域名'
+      return `连不上云端（多半是域名还没放行）。请打开云开发平台 → 环境配置 → 安全来源，加上 ${host}，等几分钟再试。若用的是 CloudBase 静态托管默认域名，一般已默认放行，可稍后再试或检查网络。`
     }
     if (/username|password|用户名|密码|disabled|未开启|not enable/i.test(msg)) {
       return '还没打开用户名密码登录，或账号不对。请到 CloudBase 控制台打开「用户名密码登录」。'

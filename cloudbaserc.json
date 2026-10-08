@@ -1,0 +1,8 @@
+{
+  "version": "2.0",
+  "envId": "remember-me-d1gmd5iiu9d88c58a",
+  "hosting": {
+    "publicPath": "./dist",
+    "ignore": ["**/.DS_Store"]
+  }
+}

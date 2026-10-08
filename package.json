@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "pack:hosting": "npm run build && rm -f remember-me-hosting.zip && cd dist && zip -r ../remember-me-hosting.zip .",
+    "deploy:hosting": "npm run build && tcb hosting deploy dist -e remember-me-d1gmd5iiu9d88c58a",
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run"
