@@ -38,10 +38,10 @@ function Chip({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className={`shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-bold ring-2 transition ${
-        selected ? 'text-white ring-ink/20' : 'bg-surface text-ink ring-ink/10'
+      className={`touch-chip shrink-0 ring-1 transition ${
+        selected ? 'text-white ring-transparent' : 'bg-surface text-ink ring-line'
       } disabled:opacity-50`}
-      style={selected ? { background: color ?? '#e25c2b' } : undefined}
+      style={selected ? { background: color ?? 'var(--color-accent)' } : undefined}
     >
       {children}
     </button>
@@ -74,13 +74,13 @@ export function ItemsPage({ items, today, loading, error, memberNames, headerAct
   }, [items, today, sort, level, category, uploader])
 
   return (
-    <div className="relative z-10 mx-auto min-h-dvh w-full max-w-xl px-4 pb-32">
+    <div className="relative z-10 mx-auto min-h-dvh w-full max-w-xl px-4 pb-[calc(112px+env(safe-area-inset-bottom))]">
       <header className="sticky top-0 z-20 -mx-4 bg-bg/95 px-4 pt-[calc(12px+env(safe-area-inset-top))] pb-3 backdrop-blur">
-        <div className="flex items-center justify-between gap-3 pr-24">
-          <div className="flex items-center gap-2.5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2.5">
             <ShibaMascot />
-            <div>
-              <p className="text-[13px] font-bold tracking-wide text-accent">全家的物品小本子 · 小六守门</p>
+            <div className="min-w-0">
+              <p className="text-[13px] font-bold tracking-wide text-accent-deep">全家的物品小本子 · 小六守门</p>
               <h1 className="brand-title text-[30px] leading-none">Remember Me</h1>
               <p className="mt-1 text-[13px] font-medium text-muted">
                 今天 {today} · {items.length} 件
@@ -97,8 +97,8 @@ export function ItemsPage({ items, today, loading, error, memberNames, headerAct
         <Legend />
       </div>
 
-      <section className="mb-4 flex flex-col gap-2">
-        <p className="text-[13px] font-black">怎么排</p>
+      <section className="mb-6 flex flex-col gap-3">
+        <p className="text-[15px] font-bold">怎么排</p>
         <div className="chip-row">
           <Chip selected={sort === 'near'} onClick={() => setSort('near')}>
             过期近 → 远
@@ -110,7 +110,7 @@ export function ItemsPage({ items, today, loading, error, memberNames, headerAct
             最近记下
           </Chip>
         </div>
-        <p className="text-[13px] font-black">过期情况</p>
+        <p className="text-[15px] font-bold">过期情况</p>
         <div className="chip-row">
           <Chip selected={level === 'all'} onClick={() => setLevel('all')}>
             全部
@@ -121,7 +121,7 @@ export function ItemsPage({ items, today, loading, error, memberNames, headerAct
             </Chip>
           ))}
         </div>
-        <p className="text-[13px] font-black">类别</p>
+        <p className="text-[15px] font-bold">类别</p>
         <div className="chip-row">
           <Chip selected={category === 'all'} onClick={() => setCategory('all')}>
             全部
@@ -132,7 +132,7 @@ export function ItemsPage({ items, today, loading, error, memberNames, headerAct
             </Chip>
           ))}
         </div>
-        <p className="text-[13px] font-black">谁记的</p>
+        <p className="text-[15px] font-bold">谁记的</p>
         <div className="chip-row">
           <Chip selected={uploader === 'all'} onClick={() => setUploader('all')}>
             全部人
@@ -151,22 +151,22 @@ export function ItemsPage({ items, today, loading, error, memberNames, headerAct
         </div>
       </section>
 
-      {error && <p className="mb-4 rounded-2xl bg-red-50 p-4 font-medium text-red-800">{error}</p>}
+      {error && <p className="mb-4 rounded-[var(--radius-card)] bg-red-50 p-4 font-medium text-red-800">{error}</p>}
 
       {loading ? (
         <p className="py-10 text-center font-medium text-muted">正在读取…</p>
       ) : items.length === 0 ? (
-        <section className="rounded-[28px] bg-surface px-5 py-8 text-center shadow-[0_8px_0_0_rgba(28,20,12,0.1)] ring-2 ring-ink/10">
-          <h2 className="text-xl font-black">本子还是空的</h2>
-          <p className="mt-2 text-muted">买了东西就点下面的大按钮。以后写错了，点卡片就能改、能删。</p>
+        <section className="rounded-[var(--radius-card)] bg-surface px-5 py-8 text-center shadow-[var(--shadow-soft)]">
+          <h2 className="text-xl font-bold">本子还是空的</h2>
+          <p className="mt-2 text-[16px] text-muted">买了东西就点下面的大按钮。以后写错了，点卡片就能改、能删。</p>
         </section>
       ) : visible.length === 0 ? (
-        <section className="rounded-[28px] bg-surface px-5 py-8 text-center ring-2 ring-ink/10">
-          <h2 className="text-lg font-black">没有符合条件的东西</h2>
-          <p className="mt-1 text-muted">换一个筛选条件，或点「全部」再看看。</p>
+        <section className="rounded-[var(--radius-card)] bg-surface px-5 py-8 text-center shadow-[var(--shadow-soft)]">
+          <h2 className="text-lg font-bold">没有符合条件的东西</h2>
+          <p className="mt-1 text-[16px] text-muted">换一个筛选条件，或点「全部」再看看。</p>
         </section>
       ) : (
-        <ul className="flex flex-col gap-3.5">
+        <ul className="flex flex-col gap-3">
           {visible.map((item) => (
             <li key={item.id}>
               <ItemCard
@@ -180,10 +180,11 @@ export function ItemsPage({ items, today, loading, error, memberNames, headerAct
         </ul>
       )}
 
+      {/* 底部居中「记一件」，左侧留给音乐控件 */}
       <button
         type="button"
         onClick={onAdd}
-        className="fixed bottom-[calc(20px+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 rounded-full bg-accent px-8 py-4 text-lg font-black text-white shadow-[0_6px_0_0_#9a3412] ring-2 ring-ink/20 active:translate-y-0.5 active:shadow-none"
+        className="btn-primary fixed bottom-[calc(20px+env(safe-area-inset-bottom))] left-1/2 z-20 -translate-x-1/2 px-8 text-[18px] shadow-[var(--shadow-soft)]"
       >
         + 记一件
       </button>

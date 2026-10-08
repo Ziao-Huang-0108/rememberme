@@ -178,7 +178,7 @@ export default function App() {
                     await signOut()
                   }
                 }}
-                className="rounded-full bg-surface px-3 py-1.5 text-xs font-bold ring-2 ring-ink/10"
+                className="btn-ghost shrink-0 px-3 text-[14px]"
               >
                 {user?.nickname || '退出'}
               </button>

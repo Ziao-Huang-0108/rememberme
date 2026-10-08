@@ -7,9 +7,6 @@ interface Props {
   onSignIn: (username: string, password: string) => Promise<void>
 }
 
-const inputClass =
-  'w-full rounded-2xl border-2 border-line bg-white px-3.5 py-3 outline-none focus:border-accent'
-
 export function LoginPage({ usernameHint = '', error, onSignIn }: Props) {
   const [username, setUsername] = useState(usernameHint)
   const [password, setPassword] = useState('')
@@ -40,26 +37,26 @@ export function LoginPage({ usernameHint = '', error, onSignIn }: Props) {
   }
 
   return (
-    <div className="relative z-10 mx-auto flex min-h-dvh w-full max-w-xl flex-col justify-center gap-5 px-4 pb-10">
+    <div className="relative z-10 mx-auto flex min-h-dvh w-full max-w-xl flex-col justify-center gap-6 px-4 pb-[calc(88px+env(safe-area-inset-bottom))] pt-[calc(16px+env(safe-area-inset-top))]">
       <div className="flex items-center gap-3">
         <img src="/shiba.png" alt="小六" className="h-20 w-20 object-contain" />
         <div>
-          <p className="text-sm font-bold text-accent">全家的物品小本子</p>
+          <p className="text-[14px] font-bold text-accent-deep">全家的物品小本子</p>
           <h1 className="brand-title text-[34px] leading-none">Remember Me</h1>
         </div>
       </div>
 
-      <section className="rounded-[28px] bg-surface p-5 shadow-[0_8px_0_0_rgba(28,20,12,0.1)] ring-2 ring-ink/10">
-        <h2 className="text-xl font-black">欢迎回家</h2>
-        <p className="mt-1 text-sm text-muted">
+      <section className="rounded-[var(--radius-card)] bg-surface p-5 shadow-[var(--shadow-soft)]">
+        <h2 className="text-xl font-bold">欢迎回家</h2>
+        <p className="mt-2 text-[15px] text-muted">
           用控制台里建好的用户名和密码登录。密码可交给浏览器保存；本站只记住本机用过的用户名，方便少打字。
         </p>
 
-        <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-3" autoComplete="on">
-          <label className="relative flex flex-col gap-1.5">
-            <span className="text-sm font-black">用户名</span>
+        <form onSubmit={handleSubmit} className="mt-5 flex flex-col gap-4" autoComplete="on">
+          <label className="relative flex flex-col gap-2">
+            <span className="text-[15px] font-bold">用户名</span>
             <input
-              className={inputClass}
+              className="field-input"
               value={username}
               onChange={(e) => {
                 setUsername(e.target.value)
@@ -67,7 +64,6 @@ export function LoginPage({ usernameHint = '', error, onSignIn }: Props) {
               }}
               onFocus={() => setShowSuggestions(true)}
               onBlur={() => {
-                // 稍等，好让点选项的点击先触发
                 window.setTimeout(() => setShowSuggestions(false), 150)
               }}
               placeholder="例如 mama"
@@ -77,12 +73,12 @@ export function LoginPage({ usernameHint = '', error, onSignIn }: Props) {
               required
             />
             {showSuggestions && suggestions.length > 0 && (
-              <ul className="absolute top-[calc(100%+4px)] left-0 right-0 z-20 overflow-hidden rounded-2xl bg-white shadow-[0_8px_24px_rgba(28,20,12,0.12)] ring-2 ring-ink/10">
+              <ul className="absolute top-[calc(100%+4px)] right-0 left-0 z-20 overflow-hidden rounded-[var(--radius-card)] bg-white shadow-[var(--shadow-soft)] ring-1 ring-line">
                 {suggestions.map((name) => (
                   <li key={name}>
                     <button
                       type="button"
-                      className="w-full px-3.5 py-3 text-left text-sm font-bold hover:bg-accent-soft"
+                      className="min-h-11 w-full px-4 py-3 text-left text-[16px] font-bold active:bg-accent-soft"
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => pickUsername(name)}
                     >
@@ -94,12 +90,12 @@ export function LoginPage({ usernameHint = '', error, onSignIn }: Props) {
             )}
           </label>
 
-          <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-black">密码</span>
+          <label className="flex flex-col gap-2">
+            <span className="text-[15px] font-bold">密码</span>
             <input
               ref={passwordRef}
               type="password"
-              className={inputClass}
+              className="field-input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="至少 6 位"
@@ -109,17 +105,13 @@ export function LoginPage({ usernameHint = '', error, onSignIn }: Props) {
             />
           </label>
 
-          <button
-            type="submit"
-            disabled={busy}
-            className="mt-1 rounded-full bg-accent py-3.5 text-lg font-black text-white disabled:opacity-50"
-          >
+          <button type="submit" disabled={busy} className="btn-primary mt-1 w-full">
             {busy ? '请稍等…' : '登录'}
           </button>
         </form>
 
         {(localError || error) && (
-          <p className="mt-3 rounded-2xl bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{localError || error}</p>
+          <p className="mt-4 rounded-[var(--radius-card)] bg-red-50 px-4 py-3 text-[15px] font-medium text-red-700">{localError || error}</p>
         )}
       </section>
     </div>

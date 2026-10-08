@@ -2,8 +2,8 @@ import { LEVELS, levelSwatch } from '../lib/expiry'
 
 export function Legend() {
   return (
-    <details className="rounded-[24px] bg-surface px-4 py-3 text-sm shadow-[0_6px_0_0_rgba(28,20,12,0.08)] ring-2 ring-ink/10">
-      <summary className="cursor-pointer font-bold">颜色点是什么意思？</summary>
+    <details className="rounded-[var(--radius-card)] bg-surface px-4 py-3 text-[15px] shadow-[var(--shadow-soft)]">
+      <summary className="min-h-11 cursor-pointer font-bold">颜色点是什么意思？</summary>
       <ul className="mt-3 grid gap-2">
         {LEVELS.map(({ level, name, range }) => (
           <li key={level} className="flex items-center gap-2">
