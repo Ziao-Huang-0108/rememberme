@@ -12,8 +12,10 @@ interface Props {
   loading: boolean
   error: string | null
   memberNames?: Record<string, string>
+  householdName?: string
   headerAction?: ReactNode
   notice?: ReactNode
+  onOpenHouseholdSwitcher?: () => void
   onAdd: () => void
   onEdit: (item: Item) => void
 }
@@ -48,15 +50,36 @@ function Chip({
   )
 }
 
-export function ItemsPage({ items, today, loading, error, memberNames, headerAction, notice, onAdd, onEdit }: Props) {
+function matchesQuery(item: Item, query: string) {
+  const q = query.trim().toLowerCase()
+  if (!q) return true
+  const hay = [item.name, item.location, item.note, item.description].join('\n').toLowerCase()
+  return hay.includes(q)
+}
+
+export function ItemsPage({
+  items,
+  today,
+  loading,
+  error,
+  memberNames,
+  householdName,
+  headerAction,
+  notice,
+  onOpenHouseholdSwitcher,
+  onAdd,
+  onEdit,
+}: Props) {
   const [sort, setSort] = useState<SortKey>('near')
   const [level, setLevel] = useState<ExpiryLevel | 'all'>('all')
   const [category, setCategory] = useState<string>('all')
   const [uploader, setUploader] = useState<string>('all')
+  const [query, setQuery] = useState('')
   const memberEntries = Object.entries(memberNames ?? {})
 
   const visible = useMemo(() => {
     const filtered = items.filter((item) => {
+      if (!matchesQuery(item, query)) return false
       const info = getExpiryInfo(item.expiryDate, today)
       if (level !== 'all' && info.level !== level) return false
       if (category !== 'all' && item.category !== category) return false
@@ -71,7 +94,9 @@ export function ItemsPage({ items, today, loading, error, memberNames, headerAct
       return sort === 'near' ? da - db : db - da
     })
     return copy
-  }, [items, today, sort, level, category, uploader])
+  }, [items, today, sort, level, category, uploader, query])
+
+  const hasQuery = query.trim().length > 0
 
   return (
     <div className="relative z-10 mx-auto min-h-dvh w-full max-w-xl px-4 pb-[calc(112px+env(safe-area-inset-bottom))]">
@@ -89,6 +114,18 @@ export function ItemsPage({ items, today, loading, error, memberNames, headerAct
           </div>
           {headerAction}
         </div>
+        {householdName && onOpenHouseholdSwitcher && (
+          <button
+            type="button"
+            onClick={onOpenHouseholdSwitcher}
+            className="mt-3 flex min-h-11 w-full items-center justify-between rounded-[var(--radius-pill)] bg-accent-soft px-4 text-left ring-1 ring-accent/40 transition active:opacity-80"
+          >
+            <span className="truncate text-[15px] font-bold text-ink">
+              当前：{householdName}
+            </span>
+            <span className="shrink-0 text-[14px] font-bold text-accent-deep">切换</span>
+          </button>
+        )}
       </header>
 
       {notice}
@@ -96,6 +133,18 @@ export function ItemsPage({ items, today, loading, error, memberNames, headerAct
       <div className="mb-3">
         <Legend />
       </div>
+
+      <label className="mb-4 flex flex-col gap-2">
+        <span className="text-[15px] font-bold">搜索物品</span>
+        <input
+          className="field-input"
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="名称、位置、备注…"
+          enterKeyHint="search"
+        />
+      </label>
 
       <section className="mb-6 flex flex-col gap-3">
         <p className="text-[15px] font-bold">怎么排</p>
@@ -162,8 +211,10 @@ export function ItemsPage({ items, today, loading, error, memberNames, headerAct
         </section>
       ) : visible.length === 0 ? (
         <section className="rounded-[var(--radius-card)] bg-surface px-5 py-8 text-center shadow-[var(--shadow-soft)]">
-          <h2 className="text-lg font-bold">没有符合条件的东西</h2>
-          <p className="mt-1 text-[16px] text-muted">换一个筛选条件，或点「全部」再看看。</p>
+          <h2 className="text-lg font-bold">{hasQuery ? '没找到相关物品' : '没有符合条件的东西'}</h2>
+          <p className="mt-1 text-[16px] text-muted">
+            {hasQuery ? '换个关键词，或清空搜索再看看。' : '换一个筛选条件，或点「全部」再看看。'}
+          </p>
         </section>
       ) : (
         <ul className="flex flex-col gap-3">

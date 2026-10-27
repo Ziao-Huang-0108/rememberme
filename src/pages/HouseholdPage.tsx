@@ -3,13 +3,15 @@ import type { Household } from '../lib/household'
 
 interface Props {
   nickname: string
+  initialMode?: 'create' | 'join'
   onCreate: (name: string, nickname: string) => Promise<void>
   onJoin: (code: string, nickname: string) => Promise<void>
   onSignOut: () => Promise<void>
+  onBack?: () => void
 }
 
-export function HouseholdPage({ nickname, onCreate, onJoin, onSignOut }: Props) {
-  const [mode, setMode] = useState<'create' | 'join'>('create')
+export function HouseholdPage({ nickname, initialMode = 'create', onCreate, onJoin, onSignOut, onBack }: Props) {
+  const [mode, setMode] = useState<'create' | 'join'>(initialMode)
   const [houseName, setHouseName] = useState('我们家')
   const [code, setCode] = useState('')
   const [name, setName] = useState(nickname)
@@ -32,8 +34,15 @@ export function HouseholdPage({ nickname, onCreate, onJoin, onSignOut }: Props) 
   return (
     <div className="relative z-10 mx-auto flex min-h-dvh w-full max-w-xl flex-col gap-5 px-4 pt-[calc(16px+env(safe-area-inset-top))] pb-[calc(88px+env(safe-area-inset-bottom))]">
       <header className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">加入家庭</h1>
-        <button type="button" onClick={() => void onSignOut()} className="btn-ghost px-3 text-[15px] text-muted">
+        <div className="min-w-0">
+          {onBack && (
+            <button type="button" onClick={onBack} className="mb-1 min-h-11 font-bold text-accent-deep underline">
+              返回选家
+            </button>
+          )}
+          <h1 className="text-2xl font-bold">加入家庭</h1>
+        </div>
+        <button type="button" onClick={() => void onSignOut()} className="btn-ghost shrink-0 px-3 text-[15px] text-muted">
           退出登录
         </button>
       </header>

@@ -129,19 +129,58 @@ export async function listMembers(householdId: string): Promise<Member[]> {
   }))
 }
 
-export async function findMyHousehold(): Promise<Household | null> {
+/** 当前用户加入的全部家庭 */
+export async function listMyHouseholds(): Promise<Household[]> {
+  const userId = await currentUserId()
+  if (!userId) return []
+
+  const { data, error } = await rdb.from('members').select().eq('user_id', userId)
+  throwIfDbError(error)
+  const memberRows = (data as Array<Record<string, unknown>>) || []
+  if (memberRows.length === 0) return []
+
+  const ids = [...new Set(memberRows.map((row) => String(row.household_id)))]
+  const houses: Household[] = []
+  for (const id of ids) {
+    const house = await loadHousehold(id)
+    if (house) houses.push(house)
+  }
+  return houses
+}
+
+/**
+ * 解析「当前家」：
+ * - 缓存仍在自己的成员列表里 → 用缓存
+ * - 只有一家 → 自动选中并写入缓存
+ * - 多家且无合法缓存 → null（交给选家 UI）
+ * - 零家 → null
+ */
+export async function resolveCurrentHousehold(
+  households?: Household[],
+): Promise<{ households: Household[]; household: Household | null }> {
+  const list = households ?? (await listMyHouseholds())
+  if (list.length === 0) {
+    setCachedHouseholdId(null)
+    return { households: list, household: null }
+  }
+
   const cached = getCachedHouseholdId()
   if (cached) {
-    const house = await loadHousehold(cached)
-    if (house) return house
+    const match = list.find((h) => h.id === cached)
+    if (match) return { households: list, household: match }
+    setCachedHouseholdId(null)
   }
-  const userId = await currentUserId()
-  if (!userId) return null
-  const { data, error } = await rdb.from('members').select().eq('user_id', userId).limit(1)
-  throwIfDbError(error)
-  const first = (data as Array<Record<string, unknown>> | null)?.[0]
-  if (!first) return null
-  const householdId = String(first.household_id)
-  setCachedHouseholdId(householdId)
-  return loadHousehold(householdId)
+
+  if (list.length === 1) {
+    setCachedHouseholdId(list[0].id)
+    return { households: list, household: list[0] }
+  }
+
+  return { households: list, household: null }
+}
+
+/** @deprecated 请用 resolveCurrentHousehold；保留给旧调用兼容 */
+export async function findMyHousehold(): Promise<Household | null> {
+  const { household } = await resolveCurrentHousehold()
+  return household
 }

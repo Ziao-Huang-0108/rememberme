@@ -70,10 +70,23 @@ npm run pack:hosting
   - 或 **新建部署 → 上传代码包**：上传 `remember-me-hosting.zip`；若让平台构建，框架选 Vite，产物目录 `dist`，并配置环境变量（见下）
 4. **SPA / 单页应用**：把「错误文档」或「404 页面」设为 `index.html`（刷新才不会空白）
 5. 打开控制台给出的默认访问地址（一般是
-  `https://remember-me-d1gmd5iiu9d88c58a.tcloudbaseapp.com`  
-   以控制台显示为准）
+  `https://remember-me-remember-me-d1gmd5iiu9d88c58a.webapps.tcloudbase.com/`  
+   或以控制台显示为准）
 
+### 5.2.1 打开默认域名却「下载 index.html」或出现风险页？
 
+**不是压缩包传错了。** 腾讯云对「默认域名」（`*.webapps.tcloudbase.com`、`*.tcloudbaseapp.com` 等）有安全策略：
+
+- 浏览器正常访问时，可能先出现 **「风险提醒」中间页**，点「确定访问」后才进网站
+- 部分打开方式（或非页面导航请求）会带上响应头 `Content-Disposition: attachment`，浏览器就会 **下载** `index.html`，而不是展示网页
+
+处理办法：
+
+1. 用手机/电脑的 **Safari / Chrome**，在地址栏直接打开默认域名；若出现风险页，点确定
+2. 不要用会改请求方式的内置浏览器（部分 App 内打开）硬试
+3. 发给家人长期用：需要绑 **已备案的自定义域名**（自定义域名不受这套默认域名限制）。家庭小范围试用可先过中间页
+
+官方说明：https://docs.cloudbase.net/service/alias
 
 ### 5.3 若选择「上传源码让云端构建」
 
