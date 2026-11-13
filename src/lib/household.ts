@@ -50,7 +50,8 @@ export async function currentUserId(): Promise<string | null> {
 export async function createHousehold(name: string, nickname: string): Promise<Household> {
   const userId = await currentUserId()
   if (!userId) throw new Error('请先登录')
-  const trimmed = name.trim() || '我们家'
+  const trimmed = name.trim()
+  if (!trimmed) throw new Error('请先给家里起个名字')
   const code = inviteCode()
 
   const { data, error } = await rdb
@@ -76,6 +77,27 @@ export async function createHousehold(name: string, nickname: string): Promise<H
 
   setCachedHouseholdId(householdId)
   return mapHousehold(row)
+}
+
+export async function renameHousehold(householdId: string, name: string): Promise<Household> {
+  const trimmed = name.trim()
+  if (!trimmed) throw new Error('请先给家里起个名字')
+
+  const { data, error } = await rdb.from('households').update({ name: trimmed }).eq('id', householdId).select()
+  throwIfDbError(error, '改名失败')
+  const row = (data as Array<Record<string, unknown>> | null)?.[0]
+  if (!row) throw new Error('改名失败')
+  return mapHousehold(row)
+}
+
+/** 只把自己移出这家，不删家庭，也不删物品。 */
+export async function leaveHousehold(householdId: string): Promise<void> {
+  const userId = await currentUserId()
+  if (!userId) throw new Error('请先登录')
+
+  const { error } = await rdb.from('members').delete().eq('household_id', householdId).eq('user_id', userId)
+  throwIfDbError(error, '退出家庭失败')
+  if (getCachedHouseholdId() === householdId) setCachedHouseholdId(null)
 }
 
 export async function joinHousehold(code: string, nickname: string): Promise<Household> {

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { BackgroundDots } from './components/BackgroundDots'
+import { ConfirmLeaveDialog } from './components/ConfirmLeaveDialog'
 import { HouseholdSwitcher } from './components/HouseholdSwitcher'
 import { SongPlayer } from './components/SongPlayer'
 import { useAuth } from './hooks/useAuth'
@@ -10,7 +11,9 @@ import { createCloudStore } from './lib/cloudStore'
 import {
   createHousehold,
   joinHousehold,
+  leaveHousehold,
   listMembers,
+  renameHousehold,
   resolveCurrentHousehold,
   setCachedHouseholdId,
   type Household,
@@ -38,6 +41,11 @@ export default function App() {
   const [houseError, setHouseError] = useState<string | null>(null)
   const [screen, setScreen] = useState<Screen>({ name: 'list' })
   const [switcherOpen, setSwitcherOpen] = useState(false)
+  const [leaveOpen, setLeaveOpen] = useState(false)
+  const [leaveTarget, setLeaveTarget] = useState<Household | null>(null)
+  const [leaveIsLast, setLeaveIsLast] = useState(false)
+  const [leaveBusy, setLeaveBusy] = useState(false)
+  const [leaveError, setLeaveError] = useState<string | null>(null)
   const [forceLocal, setForceLocal] = useState(() => localStorage.getItem('remember-me:force-local') === '1')
 
   const refreshMembers = useCallback(async (houseId: string) => {
@@ -55,6 +63,7 @@ export default function App() {
       setHouseGate('ready')
       setScreen({ name: 'list' })
       setSwitcherOpen(false)
+      setLeaveOpen(false)
     },
     [refreshMembers],
   )
@@ -119,11 +128,60 @@ export default function App() {
     await enterHousehold(house, resolved.households)
   }
 
+  async function handleRename(householdId: string, name: string) {
+    const updated = await renameHousehold(householdId, name)
+    setHousehold((current) => (current?.id === updated.id ? updated : current))
+    setHouseholds((prev) => prev.map((house) => (house.id === updated.id ? updated : house)))
+  }
+
+  function requestLeave(house: Household) {
+    setLeaveError(null)
+    setLeaveTarget(house)
+    setLeaveIsLast(house.id === household?.id && Object.keys(memberNames).length <= 1)
+    setLeaveOpen(true)
+    void listMembers(house.id)
+      .then((members) => setLeaveIsLast(members.length <= 1))
+      .catch(() => {})
+  }
+
+  async function confirmLeave() {
+    const target = leaveTarget ?? household
+    if (!target) return
+    const leftCurrent = target.id === household?.id
+    setLeaveBusy(true)
+    setLeaveError(null)
+    try {
+      await leaveHousehold(target.id)
+      const resolved = await resolveCurrentHousehold()
+      setLeaveOpen(false)
+      setLeaveTarget(null)
+      if (!leftCurrent) {
+        setHouseholds(resolved.households)
+        return
+      }
+      setSwitcherOpen(false)
+      if (resolved.household) {
+        await enterHousehold(resolved.household, resolved.households)
+      } else {
+        setHousehold(null)
+        setHouseholds(resolved.households)
+        setMemberNames({})
+        setScreen({ name: 'list' })
+        setHouseGate(resolved.households.length === 0 ? 'none' : 'pick')
+      }
+    } catch (err) {
+      setLeaveError(err instanceof Error ? err.message : '退出失败，请再试')
+    } finally {
+      setLeaveBusy(false)
+    }
+  }
+
   async function handleSignOut() {
     setCachedHouseholdId(null)
     setHousehold(null)
     setHouseholds([])
     setSwitcherOpen(false)
+    setLeaveOpen(false)
     setHouseGate('loading')
     await signOut()
   }
@@ -231,7 +289,7 @@ export default function App() {
           householdName={household?.name}
           notice={
             household ? (
-              <InviteBanner household={household} />
+              <InviteBanner household={household} onRequestLeave={() => requestLeave(household)} />
             ) : forceLocal ? (
               <div className="mb-3 rounded-[24px] bg-surface px-4 py-3 text-sm ring-2 ring-ink/10">
                 当前是本机模式，家人看不到。
@@ -279,6 +337,24 @@ export default function App() {
           onSelect={(house) => void enterHousehold(house, households)}
           onCreate={handleCreate}
           onJoin={handleJoin}
+          onRename={handleRename}
+          onRequestLeave={requestLeave}
+        />
+      )}
+      {household && (
+        <ConfirmLeaveDialog
+          open={leaveOpen}
+          householdName={leaveTarget?.name ?? household.name}
+          isLastMember={leaveIsLast}
+          busy={leaveBusy}
+          error={leaveError}
+          onCancel={() => {
+            if (leaveBusy) return
+            setLeaveOpen(false)
+            setLeaveTarget(null)
+            setLeaveError(null)
+          }}
+          onConfirm={() => void confirmLeave()}
         />
       )}
     </>

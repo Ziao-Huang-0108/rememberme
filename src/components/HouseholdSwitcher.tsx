@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import type { Household } from '../lib/household'
 
 interface Props {
@@ -10,6 +10,8 @@ interface Props {
   onSelect: (household: Household) => void
   onCreate: (name: string, nickname: string) => Promise<void>
   onJoin: (code: string, nickname: string) => Promise<void>
+  onRename: (householdId: string, name: string) => Promise<void>
+  onRequestLeave: (household: Household) => void
 }
 
 type PanelMode = 'list' | 'create' | 'join'
@@ -23,28 +25,44 @@ export function HouseholdSwitcher({
   onSelect,
   onCreate,
   onJoin,
+  onRename,
+  onRequestLeave,
 }: Props) {
   const [mode, setMode] = useState<PanelMode>('list')
-  const [houseName, setHouseName] = useState('我们家')
+  const [houseName, setHouseName] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [renameDraft, setRenameDraft] = useState('')
+  const [renameError, setRenameError] = useState<string | null>(null)
   const [code, setCode] = useState('')
   const [name, setName] = useState(nickname)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!open) return
-    setMode('list')
-    setHouseName('我们家')
-    setCode('')
-    setName(nickname)
-    setBusy(false)
-    setError(null)
-  }, [open, nickname])
+  const savingName = useRef(false)
+  const openSession = open ? `${currentId}\0${nickname}` : ''
+  const [session, setSession] = useState(openSession)
+  if (session !== openSession) {
+    setSession(openSession)
+    if (open) {
+      setMode('list')
+      setHouseName('')
+      setEditingId(null)
+      setRenameDraft('')
+      setRenameError(null)
+      setCode('')
+      setName(nickname)
+      setBusy(false)
+      setError(null)
+    }
+  }
 
   if (!open) return null
 
   async function submit(e: FormEvent) {
     e.preventDefault()
+    if (mode === 'create' && !houseName.trim()) {
+      setError('请先给家里起个名字')
+      return
+    }
     setBusy(true)
     setError(null)
     try {
@@ -53,6 +71,30 @@ export function HouseholdSwitcher({
     } catch (err) {
       setError(err instanceof Error ? err.message : '失败了，请再试')
       setBusy(false)
+    }
+  }
+
+  async function saveRename(house: Household) {
+    const trimmed = renameDraft.trim()
+    if (trimmed === house.name) {
+      setEditingId(null)
+      setRenameError(null)
+      return
+    }
+    if (!trimmed) {
+      setRenameError('请先给家里起个名字')
+      return
+    }
+    if (savingName.current) return
+    savingName.current = true
+    setRenameError(null)
+    try {
+      await onRename(house.id, trimmed)
+      setEditingId(null)
+    } catch (err) {
+      setRenameError(err instanceof Error ? err.message : '改名失败')
+    } finally {
+      savingName.current = false
     }
   }
 
@@ -79,21 +121,70 @@ export function HouseholdSwitcher({
             <ul className="flex flex-col gap-2">
               {households.map((house) => {
                 const selected = house.id === currentId
+                const editing = editingId === house.id
                 return (
-                  <li key={house.id}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onSelect(house)
-                        onClose()
-                      }}
-                      className={`flex min-h-14 w-full items-center justify-between rounded-[var(--radius-card)] px-4 py-3 text-left ring-1 transition active:opacity-80 ${
-                        selected ? 'bg-accent-soft ring-accent text-ink' : 'bg-surface ring-line'
-                      }`}
-                    >
-                      <span className="text-[17px] font-bold">{house.name}</span>
-                      {selected && <span className="text-[14px] font-bold text-accent-deep">当前</span>}
-                    </button>
+                  <li
+                    key={house.id}
+                    className={`rounded-[var(--radius-card)] px-3 py-2 ring-1 ${
+                      selected ? 'bg-accent-soft ring-accent' : 'bg-surface ring-line'
+                    }`}
+                  >
+                    <div className="flex min-h-14 items-center gap-2">
+                      {editing ? (
+                        <form
+                          className="min-w-0 flex-1"
+                          onSubmit={(event) => {
+                            event.preventDefault()
+                            void saveRename(house)
+                          }}
+                        >
+                          <input
+                            className="field-input"
+                            value={renameDraft}
+                            onChange={(event) => setRenameDraft(event.target.value)}
+                            onBlur={() => void saveRename(house)}
+                            aria-label={`${house.name}的名字`}
+                            aria-invalid={renameError ? true : undefined}
+                            enterKeyHint="done"
+                            autoFocus
+                          />
+                        </form>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onSelect(house)
+                            onClose()
+                          }}
+                          className="min-h-11 min-w-0 flex-1 truncate px-1 text-left text-[17px] font-bold active:opacity-80"
+                        >
+                          {house.name}
+                          {selected && <span className="ml-2 text-[14px] font-bold text-accent-deep">当前</span>}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="btn-ghost shrink-0 px-3 text-[15px]"
+                        onClick={() => {
+                          if (editingId === house.id) return
+                          setEditingId(house.id)
+                          setRenameDraft(house.name)
+                          setRenameError(null)
+                        }}
+                      >
+                        编辑
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-ghost shrink-0 px-3 text-[15px]"
+                        onClick={() => onRequestLeave(house)}
+                      >
+                        删除
+                      </button>
+                    </div>
+                    {editing && renameError && (
+                      <p className="px-1 pb-1 text-[15px] text-red-700">{renameError}</p>
+                    )}
                   </li>
                 )
               })}
@@ -132,7 +223,7 @@ export function HouseholdSwitcher({
                   className="field-input"
                   value={houseName}
                   onChange={(e) => setHouseName(e.target.value)}
-                  placeholder="我们家"
+                  placeholder="比如：我们家"
                 />
               </label>
             ) : (

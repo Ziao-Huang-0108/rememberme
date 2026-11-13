@@ -12,7 +12,7 @@ interface Props {
 
 export function HouseholdPage({ nickname, initialMode = 'create', onCreate, onJoin, onSignOut, onBack }: Props) {
   const [mode, setMode] = useState<'create' | 'join'>(initialMode)
-  const [houseName, setHouseName] = useState('我们家')
+  const [houseName, setHouseName] = useState('')
   const [code, setCode] = useState('')
   const [name, setName] = useState(nickname)
   const [busy, setBusy] = useState(false)
@@ -20,6 +20,10 @@ export function HouseholdPage({ nickname, initialMode = 'create', onCreate, onJo
 
   async function submit(e: FormEvent) {
     e.preventDefault()
+    if (mode === 'create' && !houseName.trim()) {
+      setError('请先给家里起个名字')
+      return
+    }
     setBusy(true)
     setError(null)
     try {
@@ -77,7 +81,7 @@ export function HouseholdPage({ nickname, initialMode = 'create', onCreate, onJo
               className="field-input"
               value={houseName}
               onChange={(e) => setHouseName(e.target.value)}
-              placeholder="我们家"
+              placeholder="比如：我们家"
             />
           </label>
         ) : (
@@ -103,18 +107,25 @@ export function HouseholdPage({ nickname, initialMode = 'create', onCreate, onJo
   )
 }
 
-export function InviteBanner({ household }: { household: Household }) {
+export function InviteBanner({
+  household,
+  onRequestLeave,
+}: {
+  household: Household
+  onRequestLeave: () => void
+}) {
   const [copied, setCopied] = useState(false)
+
   return (
     <div className="mb-3 rounded-[var(--radius-card)] bg-accent-soft px-4 py-3 text-[15px] shadow-[var(--shadow-soft)]">
-      <p className="font-bold">{household.name}</p>
-      <p className="mt-1 text-muted">
+      <p className="min-w-0 truncate text-[17px] font-bold">{household.name}</p>
+      <p className="mt-2 text-muted">
         邀请码 <span className="font-bold tracking-widest text-accent-deep">{household.inviteCode}</span>
         ，发给家人就能一起记。
       </p>
       <button
         type="button"
-        className="mt-2 min-h-11 font-bold text-accent-deep underline"
+        className="mt-1 min-h-11 font-bold text-accent-deep underline"
         onClick={async () => {
           await navigator.clipboard.writeText(household.inviteCode)
           setCopied(true)
@@ -122,6 +133,9 @@ export function InviteBanner({ household }: { household: Household }) {
         }}
       >
         {copied ? '已复制' : '复制邀请码'}
+      </button>
+      <button type="button" className="btn-ghost mt-2 w-full" onClick={onRequestLeave}>
+        退出这个家
       </button>
     </div>
   )
