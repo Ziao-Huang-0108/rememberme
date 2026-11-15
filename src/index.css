@@ -18,6 +18,10 @@
   --radius-input: 12px;
 }
 
+html {
+  --text-scale: 1;
+}
+
 html,
 body {
   background: var(--color-bg);
@@ -32,6 +36,8 @@ body {
   position: relative;
   z-index: 1;
   isolation: isolate;
+  /* 三档字号：缩放整页（含 Tailwind 的 px 字号；Safari / Chrome 可用） */
+  zoom: var(--text-scale);
 }
 
 body {

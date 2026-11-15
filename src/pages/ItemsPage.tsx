@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { ItemCard } from '../components/ItemCard'
 import { Legend } from '../components/Legend'
 import { ShibaMascot } from '../components/ShibaMascot'
+import { TextScaleSlider } from '../components/TextScaleSlider'
 import { CATEGORIES } from '../lib/categories'
 import { LEVELS, daysUntil, getExpiryInfo, levelSwatch, type ExpiryLevel } from '../lib/expiry'
 import type { Item } from '../lib/types'
@@ -99,7 +100,7 @@ export function ItemsPage({
   const hasQuery = query.trim().length > 0
 
   return (
-    <div className="relative z-10 mx-auto min-h-dvh w-full max-w-xl px-4 pb-[calc(112px+env(safe-area-inset-bottom))]">
+    <div className="relative z-10 mx-auto min-h-dvh w-full max-w-xl px-4 pb-[calc(168px+env(safe-area-inset-bottom))]">
       <header className="sticky top-0 z-20 -mx-4 bg-bg/95 px-4 pt-[calc(12px+env(safe-area-inset-top))] pb-3 backdrop-blur">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2.5">
@@ -231,14 +232,19 @@ export function ItemsPage({
         </ul>
       )}
 
-      {/* 底部居中「记一件」，左侧留给音乐控件 */}
-      <button
-        type="button"
-        onClick={onAdd}
-        className="btn-primary fixed bottom-[calc(20px+env(safe-area-inset-bottom))] left-1/2 z-20 -translate-x-1/2 px-8 text-[18px] shadow-[var(--shadow-soft)]"
-      >
-        + 记一件
-      </button>
+      {/* 字号滑杆在「记一件」上方；左侧仍留给音乐控件 */}
+      <div className="fixed inset-x-0 bottom-0 z-20 px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-2">
+        <div className="mx-auto flex max-w-xl flex-col gap-3">
+          <TextScaleSlider />
+          <button
+            type="button"
+            onClick={onAdd}
+            className="btn-primary mx-auto px-8 text-[18px] shadow-[var(--shadow-soft)]"
+          >
+            + 记一件
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

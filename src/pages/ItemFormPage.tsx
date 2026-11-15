@@ -40,13 +40,26 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   )
 }
 
+function hasExtraFields(item?: Item) {
+  if (!item) return false
+  return Boolean(
+    item.price != null ||
+      item.purchaseDate ||
+      item.description.trim() ||
+      item.note.trim() ||
+      item.photo,
+  )
+}
+
 export function ItemFormPage({ item, today, locations, onSave, onDelete, onCancel }: Props) {
   const [form, setForm] = useState<ItemInput>(() =>
-    item ? { ...emptyInput, ...item } : { ...emptyInput, purchaseDate: today },
+    item ? { ...emptyInput, ...item } : { ...emptyInput },
   )
   const [priceText, setPriceText] = useState(item?.price != null ? String(item.price) : '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [captureHint, setCaptureHint] = useState<string | null>(null)
+  const [moreOpen, setMoreOpen] = useState(() => hasExtraFields(item))
 
   const set = <K extends keyof ItemInput>(key: K, value: ItemInput[K]) => setForm((f) => ({ ...f, [key]: value }))
   const info = getExpiryInfo(form.expiryDate, today)
@@ -111,35 +124,87 @@ export function ItemFormPage({ item, today, locations, onSave, onDelete, onCance
       {error && <p className="rounded-[var(--radius-card)] bg-red-50 px-4 py-3 text-[15px] font-medium text-red-700">{error}</p>}
 
       <div className="flex flex-col gap-2">
-        <span className="text-[15px] font-bold">
-          照片 <span className="font-medium text-muted">选填，拍外观或放在哪</span>
-        </span>
-        {form.photo ? (
-          <div className="relative">
-            <img src={form.photo} alt="" className="h-44 w-full rounded-[var(--radius-card)] object-cover shadow-[var(--shadow-soft)]" />
-            <button type="button" onClick={() => set('photo', null)} className="btn-ghost absolute top-3 right-3 bg-white/95 px-3 text-[14px]">
-              去掉照片
-            </button>
-          </div>
-        ) : (
-          <label className="grid min-h-32 place-items-center rounded-[var(--radius-card)] border border-dashed border-line bg-surface px-4 text-center text-[16px] font-bold text-muted">
-            点这里拍照或选一张图
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="sr-only"
-              onChange={(e) => {
-                handlePhoto(e.target.files?.[0])
-                e.target.value = ''
-              }}
-            />
-          </label>
+        <span className="text-[15px] font-bold">先采集，再核对</span>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => setCaptureHint('「拍包装」下一版接上。这版请先手填名称和过期日期。')}
+            className="btn-ghost min-h-14 w-full flex-col gap-0.5 py-3 text-[16px]"
+          >
+            <span>拍包装</span>
+            <span className="text-[12px] font-medium text-muted">认日期 · 即将支持</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setCaptureHint('「说话填写」下一版接上。这版请先手填下面的内容。')}
+            className="btn-ghost min-h-14 w-full flex-col gap-0.5 py-3 text-[16px]"
+          >
+            <span>说话填写</span>
+            <span className="text-[12px] font-medium text-muted">少打字 · 即将支持</span>
+          </button>
+        </div>
+        {captureHint && (
+          <p className="rounded-[var(--radius-card)] bg-accent-soft px-4 py-3 text-[15px] font-medium text-ink" role="status">
+            {captureHint}
+          </p>
         )}
       </div>
 
       <Field label="名称">
-        <input className="field-input" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="例如：布洛芬" autoFocus={!item} />
+        <input
+          className="field-input"
+          value={form.name}
+          onChange={(e) => set('name', e.target.value)}
+          placeholder="例如：布洛芬"
+          autoFocus={!item}
+        />
+      </Field>
+
+      <div className="flex flex-col gap-2">
+        <Field label="过期日期" hint="不过期的可以不填">
+          <input
+            type="date"
+            className="field-input"
+            value={form.expiryDate ?? ''}
+            onChange={(e) => set('expiryDate', e.target.value || null)}
+          />
+        </Field>
+        <div className="flex flex-wrap gap-2">
+          <span className="self-center text-[13px] font-medium text-muted">从今天起算：</span>
+          {QUICK_SPANS.map(({ label, months }) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => set('expiryDate', addMonths(today, months))}
+              className="touch-chip bg-surface text-[13px] ring-1 ring-line"
+            >
+              {label}
+            </button>
+          ))}
+          {form.expiryDate && (
+            <button type="button" onClick={() => set('expiryDate', null)} className="touch-chip text-[13px] text-muted underline ring-0">
+              清空
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-2 text-[15px] font-medium text-muted">
+          现在的状态：<ExpiryBadge info={info} />
+        </div>
+      </div>
+
+      <Field label="放在哪" hint="选填">
+        <input
+          className="field-input"
+          value={form.location}
+          onChange={(e) => set('location', e.target.value)}
+          placeholder="例如：客厅-电视柜左边抽屉"
+          list="location-options"
+        />
+        <datalist id="location-options">
+          {locations.map((l) => (
+            <option key={l} value={l} />
+          ))}
+        </datalist>
       </Field>
 
       <div className="flex flex-col gap-2">
@@ -162,58 +227,90 @@ export function ItemFormPage({ item, today, locations, onSave, onDelete, onCance
         </div>
       </div>
 
-      <Field label="功能 / 用途" hint="选填">
-        <textarea className="field-input min-h-20" value={form.description} onChange={(e) => set('description', e.target.value)} placeholder="例如：退烧、止痛" />
-      </Field>
+      <div className="flex flex-col gap-3">
+        <button
+          type="button"
+          onClick={() => setMoreOpen((open) => !open)}
+          className="btn-ghost w-full justify-between px-4 text-[15px]"
+          aria-expanded={moreOpen}
+        >
+          <span>还可以补充</span>
+          <span className="font-medium text-muted">{moreOpen ? '收起' : '展开'}</span>
+        </button>
 
-      <Field label="放在哪" hint="选填">
-        <input className="field-input" value={form.location} onChange={(e) => set('location', e.target.value)} placeholder="例如：客厅-电视柜左边抽屉" list="location-options" />
-        <datalist id="location-options">
-          {locations.map((l) => (
-            <option key={l} value={l} />
-          ))}
-        </datalist>
-      </Field>
+        {moreOpen && (
+          <div className="flex flex-col gap-6 rounded-[var(--radius-card)] bg-surface px-4 py-4 shadow-[var(--shadow-soft)]">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="价格" hint="选填 · 元">
+                <input
+                  className="field-input"
+                  value={priceText}
+                  onChange={(e) => setPriceText(e.target.value)}
+                  inputMode="decimal"
+                  placeholder="0"
+                />
+              </Field>
+              <Field label="购买日期" hint="选填">
+                <input
+                  type="date"
+                  className="field-input"
+                  value={form.purchaseDate ?? ''}
+                  onChange={(e) => set('purchaseDate', e.target.value || null)}
+                />
+              </Field>
+            </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="价格" hint="元">
-          <input className="field-input" value={priceText} onChange={(e) => setPriceText(e.target.value)} inputMode="decimal" placeholder="0" />
-        </Field>
-        <Field label="购买日期">
-          <input type="date" className="field-input" value={form.purchaseDate ?? ''} onChange={(e) => set('purchaseDate', e.target.value || null)} />
-        </Field>
+            <Field label="功能 / 用途" hint="选填">
+              <textarea
+                className="field-input min-h-20"
+                value={form.description}
+                onChange={(e) => set('description', e.target.value)}
+                placeholder="例如：退烧、止痛"
+              />
+            </Field>
+
+            <Field label="备注" hint="选填">
+              <textarea className="field-input min-h-16" value={form.note} onChange={(e) => set('note', e.target.value)} />
+            </Field>
+
+            <div className="flex flex-col gap-2">
+              <span className="text-[15px] font-bold">
+                外观照片 <span className="font-medium text-muted">选填</span>
+              </span>
+              {form.photo ? (
+                <div className="relative">
+                  <img
+                    src={form.photo}
+                    alt=""
+                    className="h-44 w-full rounded-[var(--radius-card)] object-cover shadow-[var(--shadow-soft)]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => set('photo', null)}
+                    className="btn-ghost absolute top-3 right-3 bg-white/95 px-3 text-[14px]"
+                  >
+                    去掉照片
+                  </button>
+                </div>
+              ) : (
+                <label className="grid min-h-32 place-items-center rounded-[var(--radius-card)] border border-dashed border-line bg-bg px-4 text-center text-[16px] font-bold text-muted">
+                  点这里拍照或选一张图
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="sr-only"
+                    onChange={(e) => {
+                      handlePhoto(e.target.files?.[0])
+                      e.target.value = ''
+                    }}
+                  />
+                </label>
+              )}
+            </div>
+          </div>
+        )}
       </div>
-
-      <div className="flex flex-col gap-2">
-        <Field label="过期日期" hint="不过期的可以不填">
-          <input type="date" className="field-input" value={form.expiryDate ?? ''} onChange={(e) => set('expiryDate', e.target.value || null)} />
-        </Field>
-        <div className="flex flex-wrap gap-2">
-          <span className="self-center text-[13px] font-medium text-muted">从购买日起算：</span>
-          {QUICK_SPANS.map(({ label, months }) => (
-            <button
-              key={label}
-              type="button"
-              onClick={() => set('expiryDate', addMonths(form.purchaseDate ?? today, months))}
-              className="touch-chip bg-surface text-[13px] ring-1 ring-line"
-            >
-              {label}
-            </button>
-          ))}
-          {form.expiryDate && (
-            <button type="button" onClick={() => set('expiryDate', null)} className="touch-chip text-[13px] text-muted underline ring-0">
-              清空
-            </button>
-          )}
-        </div>
-        <div className="flex items-center gap-2 text-[15px] font-medium text-muted">
-          现在的状态：<ExpiryBadge info={info} />
-        </div>
-      </div>
-
-      <Field label="备注" hint="选填">
-        <textarea className="field-input min-h-16" value={form.note} onChange={(e) => set('note', e.target.value)} />
-      </Field>
 
       {onDelete && (
         <button
