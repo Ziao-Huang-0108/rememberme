@@ -132,7 +132,7 @@ export function HouseholdSwitcher({
                     <div className="flex min-h-14 items-center gap-2">
                       {editing ? (
                         <form
-                          className="min-w-0 flex-1"
+                          className="relative min-w-0 flex-1"
                           onSubmit={(event) => {
                             event.preventDefault()
                             void saveRename(house)
@@ -140,47 +140,64 @@ export function HouseholdSwitcher({
                         >
                           <input
                             className="field-input"
+                            style={{ minHeight: '4rem', paddingRight: '6.5rem' }}
                             value={renameDraft}
                             onChange={(event) => setRenameDraft(event.target.value)}
-                            onBlur={() => void saveRename(house)}
+                            onBlur={(event) => {
+                              const next = event.relatedTarget
+                              if (next instanceof HTMLElement && event.currentTarget.form?.contains(next)) return
+                              void saveRename(house)
+                            }}
                             aria-label={`${house.name}的名字`}
                             aria-invalid={renameError ? true : undefined}
                             enterKeyHint="done"
                             autoFocus
                           />
+                          <button
+                            type="submit"
+                            className="btn-primary absolute top-1/2 right-2 z-10 -translate-y-1/2 whitespace-nowrap"
+                            onPointerDown={(event) => {
+                              event.preventDefault()
+                            }}
+                          >
+                            保存
+                          </button>
                         </form>
                       ) : (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            onSelect(house)
-                            onClose()
-                          }}
-                          className="min-h-11 min-w-0 flex-1 truncate px-1 text-left text-[17px] font-bold active:opacity-80"
-                        >
-                          {house.name}
-                          {selected && <span className="ml-2 text-[14px] font-bold text-accent-deep">当前</span>}
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onSelect(house)
+                              onClose()
+                            }}
+                            className="min-h-11 min-w-0 flex-1 truncate px-1 text-left text-[17px] font-bold active:opacity-80"
+                          >
+                            {house.name}
+                            {selected && (
+                              <span className="ml-2 text-[14px] font-bold text-accent-deep">当前</span>
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-ghost shrink-0 px-3 text-[15px]"
+                            onClick={() => {
+                              setEditingId(house.id)
+                              setRenameDraft(house.name)
+                              setRenameError(null)
+                            }}
+                          >
+                            编辑
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-ghost shrink-0 px-3 text-[15px]"
+                            onClick={() => onRequestLeave(house)}
+                          >
+                            删除
+                          </button>
+                        </>
                       )}
-                      <button
-                        type="button"
-                        className="btn-ghost shrink-0 px-3 text-[15px]"
-                        onClick={() => {
-                          if (editingId === house.id) return
-                          setEditingId(house.id)
-                          setRenameDraft(house.name)
-                          setRenameError(null)
-                        }}
-                      >
-                        编辑
-                      </button>
-                      <button
-                        type="button"
-                        className="btn-ghost shrink-0 px-3 text-[15px]"
-                        onClick={() => onRequestLeave(house)}
-                      >
-                        删除
-                      </button>
                     </div>
                     {editing && renameError && (
                       <p className="px-1 pb-1 text-[15px] text-red-700">{renameError}</p>
