@@ -5,6 +5,7 @@ export interface ItemInput {
   purchaseDate: string | null
   expiryDate: string | null
   location: string
+  placeId: string | null
   note: string
   photo: string | null
   category: string
@@ -32,6 +33,7 @@ export const emptyInput: ItemInput = {
   purchaseDate: null,
   expiryDate: null,
   location: '',
+  placeId: null,
   note: '',
   photo: null,
   category: 'home',

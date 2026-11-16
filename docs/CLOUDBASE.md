@@ -25,11 +25,11 @@ CloudBase **静态托管的默认域名**（例如 `remember-me-d1gmd5iiu9d88c58
 
 家人账号：在 **用户管理** 里手动添加。网页上只有登录，没有注册——腾讯云不允许前端直接「用户名+密码」自助开号。
 
-## 3. 建三张表
+## 3. 建表 / 升级
 
-1. 打开 **SQL 型数据库 → 数据管理 → SQL 编辑器**
-2. 打开项目里的 `cloudbase/schema.sql`，整份复制执行
-3. 左侧 **表** 里应能看到 `households` / `members` / `items`
+**新环境：** 打开 SQL 编辑器，执行项目里的 `cloudbase/schema.sql`（含 `households` / `members` / `places` / `items`）。
+
+**已有环境（加位置图）：** 迁移 `20261116041500_places_and_place_id` 已在环境 `remember-me-d1gmd5iiu9d88c58a` 执行成功（新建 `places` 表，给 `items` 加 `place_id`）。新环境直接用上面的 `schema.sql` 即可。
 
 
 

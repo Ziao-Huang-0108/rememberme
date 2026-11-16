@@ -19,6 +19,7 @@ import {
   type Household,
 } from './lib/household'
 import { localStore } from './lib/localStore'
+import { listPlaces, savePlace, type Place } from './lib/places'
 import type { Item } from './lib/types'
 import { HouseholdPage, InviteBanner } from './pages/HouseholdPage'
 import { HouseholdPickerPage } from './pages/HouseholdPickerPage'
@@ -115,6 +116,22 @@ export default function App() {
 
   const { items, loading, error, save, remove } = useItems(store)
   const locations = useMemo(() => [...new Set(items.map((i) => i.location).filter(Boolean))].sort(), [items])
+  const [places, setPlaces] = useState<Place[]>([])
+  const placesById = useMemo(() => Object.fromEntries(places.map((p) => [p.id, p])), [places])
+  const useCloudPlaces = Boolean(household && !forceLocal && cloudReady)
+  const placesHouseholdId = household?.id ?? 'local'
+
+  const refreshPlaces = useCallback(async () => {
+    try {
+      setPlaces(await listPlaces(placesHouseholdId, useCloudPlaces))
+    } catch {
+      setPlaces([])
+    }
+  }, [placesHouseholdId, useCloudPlaces])
+
+  useEffect(() => {
+    void refreshPlaces()
+  }, [refreshPlaces])
 
   async function handleCreate(name: string, nick: string) {
     const house = await createHousehold(name, nick)
@@ -265,6 +282,12 @@ export default function App() {
           item={screen.item}
           today={today}
           locations={locations}
+          places={places}
+          onCreatePlace={async (input) => {
+            const place = await savePlace(placesHouseholdId, input, useCloudPlaces)
+            await refreshPlaces()
+            return place
+          }}
           onCancel={() => setScreen({ name: 'list' })}
           onSave={async (input) => {
             await save(input, screen.item?.id)
@@ -285,6 +308,7 @@ export default function App() {
           today={today}
           loading={loading}
           error={error}
+          placesById={placesById}
           memberNames={memberNames}
           householdName={household?.name}
           notice={

@@ -185,6 +185,11 @@ select {
   }
 }
 
+/* 字号入口：抵消整页 zoom，位置不随档位漂移 */
+.text-scale-anchor {
+  zoom: calc(1 / var(--text-scale, 1));
+}
+
 @media (prefers-reduced-motion: reduce) {
   .bg-dot {
     animation: none;

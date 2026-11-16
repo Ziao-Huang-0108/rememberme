@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { onSongHold, onSongRelease } from '../lib/songControl'
 
 const MUTE_KEY = 'remember-me:song-muted'
 const POS_KEY = 'remember-me:song-pos'
@@ -105,6 +106,8 @@ export function SongPlayer() {
     moved: boolean
   } | null>(null)
 
+  const voiceHoldRef = useRef(false)
+
   useEffect(() => {
     const audio = audioRef.current
     if (!audio) return
@@ -113,10 +116,12 @@ export function SongPlayer() {
 
     const tryPlay = () => {
       if (localStorage.getItem(MUTE_KEY) === '1') return
+      if (voiceHoldRef.current) return
       audio.muted = false
       void audio.play().catch(() => {
         const unlock = () => {
           if (localStorage.getItem(MUTE_KEY) === '1') return
+          if (voiceHoldRef.current) return
           void audio.play().catch(() => undefined)
         }
         window.addEventListener('pointerdown', unlock, { once: true })
@@ -124,6 +129,30 @@ export function SongPlayer() {
     }
 
     tryPlay()
+
+    const offHold = onSongHold(() => {
+      if (localStorage.getItem(MUTE_KEY) === '1') {
+        voiceHoldRef.current = false
+        return
+      }
+      if (!audio.paused) {
+        voiceHoldRef.current = true
+        audio.pause()
+      } else {
+        voiceHoldRef.current = false
+      }
+    })
+    const offRelease = onSongRelease(() => {
+      if (!voiceHoldRef.current) return
+      voiceHoldRef.current = false
+      if (localStorage.getItem(MUTE_KEY) === '1') return
+      audio.muted = false
+      void audio.play().catch(() => undefined)
+    })
+    return () => {
+      offHold()
+      offRelease()
+    }
   }, [])
 
   useEffect(() => {

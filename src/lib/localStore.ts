@@ -15,6 +15,7 @@ function normalize(raw: unknown): Item | null {
     purchaseDate: it.purchaseDate ?? null,
     expiryDate: it.expiryDate ?? null,
     location: it.location ?? '',
+    placeId: typeof it.placeId === 'string' ? it.placeId : null,
     note: it.note ?? '',
     photo: it.photo ?? null,
     category: categoryOf(it.category).id,

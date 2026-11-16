@@ -17,6 +17,16 @@ CREATE TABLE IF NOT EXISTS members (
   UNIQUE (household_id, user_id)
 );
 
+CREATE TABLE IF NOT EXISTS places (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  household_id uuid NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+  label text NOT NULL,
+  icon text NOT NULL DEFAULT 'other',
+  photo text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS items (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   household_id uuid NOT NULL REFERENCES households(id) ON DELETE CASCADE,
@@ -26,6 +36,7 @@ CREATE TABLE IF NOT EXISTS items (
   purchase_date date,
   expiry_date date,
   location text NOT NULL DEFAULT '',
+  place_id uuid REFERENCES places(id) ON DELETE SET NULL,
   note text NOT NULL DEFAULT '',
   photo text,
   category text NOT NULL DEFAULT 'home',
@@ -35,11 +46,13 @@ CREATE TABLE IF NOT EXISTS items (
 );
 
 CREATE INDEX IF NOT EXISTS items_household_id_idx ON items(household_id);
+CREATE INDEX IF NOT EXISTS places_household_id_idx ON places(household_id);
 CREATE INDEX IF NOT EXISTS members_user_id_idx ON members(user_id);
 CREATE INDEX IF NOT EXISTS households_invite_code_idx ON households(invite_code);
 
 ALTER TABLE households ENABLE ROW LEVEL SECURITY;
 ALTER TABLE members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE places ENABLE ROW LEVEL SECURITY;
 ALTER TABLE items ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY households_auth_all ON households
@@ -54,6 +67,12 @@ CREATE POLICY members_auth_all ON members
   USING (true)
   WITH CHECK (true);
 
+CREATE POLICY places_auth_all ON places
+  FOR ALL
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
 CREATE POLICY items_auth_all ON items
   FOR ALL
   TO authenticated
@@ -63,4 +82,5 @@ CREATE POLICY items_auth_all ON items
 GRANT USAGE ON SCHEMA public TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON households TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON members TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON places TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON items TO authenticated;

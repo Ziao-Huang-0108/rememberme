@@ -4,6 +4,12 @@ import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  optimizeDeps: {
+    exclude: ['@paddleocr/paddleocr-js', 'onnxruntime-web'],
+  },
+  worker: {
+    format: 'es',
+  },
   plugins: [
     react(),
     tailwindcss(),
@@ -35,8 +41,15 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // 歌曲约 10MB，不预缓存，按需拉取
+        // 歌曲与 OCR（OpenCV / ORT / worker）体积大，不预缓存，首次用时再下
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+        globIgnores: [
+          '**/assets/ort-wasm-*',
+          '**/assets/worker-entry-*',
+          '**/assets/ort.bundle*',
+          '**/assets/dist-*', // OpenCV.js 懒加载包
+        ],
         navigateFallback: '/index.html',
         runtimeCaching: [
           {
@@ -58,6 +71,20 @@ export default defineConfig({
               expiration: {
                 maxEntries: 20,
                 maxAgeSeconds: 60 * 60 * 24 * 365,
+              },
+            },
+          },
+          {
+            // PaddleOCR 模型（百度云）+ ONNX Runtime WASM
+            urlPattern: ({ url }) =>
+              url.hostname.includes('bcebos.com') ||
+              (url.hostname.includes('jsdelivr.net') && url.pathname.includes('onnxruntime-web')),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'remember-me-ocr-assets',
+              expiration: {
+                maxEntries: 20,
+                maxAgeSeconds: 60 * 60 * 24 * 90,
               },
             },
           },

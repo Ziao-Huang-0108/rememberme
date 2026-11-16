@@ -1,31 +1,25 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { ExpiryBadge } from '../components/ExpiryBadge'
+import { PhotoPreview } from '../components/PhotoPreview'
+import { PlacePicker } from '../components/PlacePicker'
 import { CATEGORIES, categoryOf } from '../lib/categories'
-import { getExpiryInfo, todayString } from '../lib/expiry'
+import { getExpiryInfo } from '../lib/expiry'
+import { extractItemFromText, mergeExtractedIntoForm } from '../lib/itemExtract'
+import { recognizePackageText } from '../lib/packageOcr'
 import { compressPhoto } from '../lib/photo'
+import type { Place, PlaceInput } from '../lib/places'
 import { emptyInput, type Item, type ItemInput } from '../lib/types'
+import { speechRecognitionAvailable, startVoiceListen, type VoiceListenHandle } from '../lib/voiceInput'
 
 interface Props {
   item?: Item
   today: string
   locations: string[]
+  places: Place[]
+  onCreatePlace: (input: PlaceInput) => Promise<Place>
   onSave: (input: ItemInput) => Promise<void>
   onDelete?: () => Promise<void>
   onCancel: () => void
-}
-
-const QUICK_SPANS: { label: string; months: number }[] = [
-  { label: '1 个月', months: 1 },
-  { label: '3 个月', months: 3 },
-  { label: '半年', months: 6 },
-  { label: '1 年', months: 12 },
-  { label: '2 年', months: 24 },
-  { label: '3 年', months: 36 },
-]
-
-function addMonths(date: string, months: number) {
-  const [y, m, d] = date.split('-').map(Number)
-  return todayString(new Date(y, m - 1 + months, d))
 }
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
@@ -43,26 +37,136 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 function hasExtraFields(item?: Item) {
   if (!item) return false
   return Boolean(
-    item.price != null ||
-      item.purchaseDate ||
-      item.description.trim() ||
-      item.note.trim() ||
-      item.photo,
+    item.price != null || item.purchaseDate || item.description.trim() || item.note.trim(),
   )
 }
 
-export function ItemFormPage({ item, today, locations, onSave, onDelete, onCancel }: Props) {
+export function ItemFormPage({
+  item,
+  today,
+  locations,
+  places,
+  onCreatePlace,
+  onSave,
+  onDelete,
+  onCancel,
+}: Props) {
   const [form, setForm] = useState<ItemInput>(() =>
     item ? { ...emptyInput, ...item } : { ...emptyInput },
   )
+  const [placeList, setPlaceList] = useState(places)
+  useEffect(() => {
+    setPlaceList(places)
+  }, [places])
   const [priceText, setPriceText] = useState(item?.price != null ? String(item.price) : '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [captureHint, setCaptureHint] = useState<string | null>(null)
   const [moreOpen, setMoreOpen] = useState(() => hasExtraFields(item))
+  const [draftText, setDraftText] = useState('')
+  const [extracting, setExtracting] = useState(false)
+  const [extractStatus, setExtractStatus] = useState<string | null>(null)
+  const [photoPreviewOpen, setPhotoPreviewOpen] = useState(false)
+  const [listening, setListening] = useState(false)
+  const packageInputRef = useRef<HTMLInputElement>(null)
+  const voiceHandleRef = useRef<VoiceListenHandle | null>(null)
+  const formRef = useRef(form)
+  const priceTextRef = useRef(priceText)
+  formRef.current = form
+  priceTextRef.current = priceText
+
+  useEffect(() => {
+    return () => {
+      void voiceHandleRef.current?.stop().catch(() => undefined)
+      voiceHandleRef.current = null
+    }
+  }, [])
 
   const set = <K extends keyof ItemInput>(key: K, value: ItemInput[K]) => setForm((f) => ({ ...f, [key]: value }))
   const info = getExpiryInfo(form.expiryDate, today)
+
+  async function applyExtractedText(rawText: string, sourceLabel: string) {
+    const current = formRef.current
+    const currentPrice = priceTextRef.current
+    const knownLocations = [...locations, ...placeList.map((p) => p.label)]
+    const extracted = await extractItemFromText(rawText, { today, knownLocations })
+    const { next, filled } = mergeExtractedIntoForm(
+      {
+        name: current.name,
+        category: current.category,
+        location: current.location,
+        description: current.description,
+        note: current.note,
+        priceText: currentPrice,
+        purchaseDate: current.purchaseDate,
+        expiryDate: current.expiryDate,
+      },
+      extracted,
+    )
+    const placeFromExtract =
+      !current.placeId && extracted.location
+        ? placeList.find((p) => p.label === extracted.location)
+        : null
+    setForm((f) => ({
+      ...f,
+      name: next.name,
+      category: next.category,
+      description: next.description,
+      note: next.note,
+      purchaseDate: next.purchaseDate,
+      expiryDate: next.expiryDate,
+      placeId: f.placeId ?? placeFromExtract?.id ?? null,
+      location: placeFromExtract ? placeFromExtract.label : next.location,
+    }))
+    setPriceText(next.priceText)
+    if (placeFromExtract && !filled.includes('放在哪')) filled.push('放在哪')
+    if (filled.some((label) => ['价格', '购买日期', '用途', '备注'].includes(label))) {
+      setMoreOpen(true)
+    }
+    setExtractStatus(
+      filled.length > 0
+        ? `${sourceLabel}已填入：${filled.join('、')}。请核对后再保存。`
+        : `${sourceLabel}没有空格子可填，或认不出新信息。已填过的不会被覆盖。`,
+    )
+  }
+
+  async function handleExtractFromText() {
+    setError(null)
+    setExtractStatus(null)
+    setExtracting(true)
+    try {
+      await applyExtractedText(draftText, '')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '自动填写失败，请再试一次')
+    } finally {
+      setExtracting(false)
+    }
+  }
+
+  async function handlePackagePhoto(file: File | undefined) {
+    if (!file) return
+    setError(null)
+    setCaptureHint(null)
+    setExtractStatus(null)
+    setExtracting(true)
+    try {
+      if (!formRef.current.photo) {
+        try {
+          set('photo', await compressPhoto(file))
+        } catch {
+          /* 外观照失败不挡识别 */
+        }
+      }
+      const text = await recognizePackageText(file, setExtractStatus)
+      setDraftText(text)
+      setExtractStatus('正在分析并填入空格…')
+      await applyExtractedText(text, '根据包装字，')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '拍包装识别失败，请再试一次或改用手填')
+    } finally {
+      setExtracting(false)
+    }
+  }
 
   async function handlePhoto(file: File | undefined) {
     if (!file) return
@@ -70,6 +174,70 @@ export function ItemFormPage({ item, today, locations, onSave, onDelete, onCance
       set('photo', await compressPhoto(file))
     } catch (err) {
       setError(err instanceof Error ? err.message : '照片加不上')
+    }
+  }
+
+  async function finishVoiceWithText(text: string) {
+    voiceHandleRef.current = null
+    setListening(false)
+    if (!text.trim()) {
+      setExtractStatus('没有听清，请再说一次，或改用手填')
+      return
+    }
+    setDraftText(text)
+    setExtracting(true)
+    setExtractStatus('正在分析并填入空格…')
+    try {
+      await applyExtractedText(text, '根据你说的，')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '自动填写失败，请再试一次')
+    } finally {
+      setExtracting(false)
+    }
+  }
+
+  async function handleVoiceToggle() {
+    setError(null)
+    setCaptureHint(null)
+
+    if (listening && voiceHandleRef.current) {
+      setExtractStatus('正在结束录音…')
+      try {
+        const text = await voiceHandleRef.current.stop()
+        await finishVoiceWithText(text)
+      } catch (err) {
+        voiceHandleRef.current = null
+        setListening(false)
+        setError(err instanceof Error ? err.message : '语音识别失败，请再试一次')
+        setExtractStatus(null)
+      }
+      return
+    }
+
+    if (!speechRecognitionAvailable()) {
+      setError('这台手机或浏览器还不支持语音输入，请改用拍包装、粘贴文字或手填')
+      return
+    }
+    if (extracting) return
+
+    try {
+      const handle = startVoiceListen({
+        onPartial: (text) => {
+          if (text) setDraftText(text)
+        },
+        onEnded: (text) => {
+          // 浏览器自己停了（例如静音太久）
+          if (!voiceHandleRef.current) return
+          void finishVoiceWithText(text)
+        },
+      })
+      voiceHandleRef.current = handle
+      setListening(true)
+      setExtractStatus('正在听…说完再点一次结束；听的时候会先暂停背景音乐')
+    } catch (err) {
+      setListening(false)
+      voiceHandleRef.current = null
+      setError(err instanceof Error ? err.message : '没法开始听，请再试一次')
     }
   }
 
@@ -128,19 +296,38 @@ export function ItemFormPage({ item, today, locations, onSave, onDelete, onCance
         <div className="grid grid-cols-2 gap-3">
           <button
             type="button"
-            onClick={() => setCaptureHint('「拍包装」下一版接上。这版请先手填名称和过期日期。')}
-            className="btn-ghost min-h-14 w-full flex-col gap-0.5 py-3 text-[16px]"
+            onClick={() => packageInputRef.current?.click()}
+            disabled={extracting || listening}
+            className="btn-ghost min-h-14 w-full flex-col gap-0.5 py-3 text-[16px] disabled:opacity-50"
           >
             <span>拍包装</span>
-            <span className="text-[12px] font-medium text-muted">认日期 · 即将支持</span>
+            <span className="text-[12px] font-medium text-muted">
+              {extracting && !listening ? '识别中…' : '认包装上的字'}
+            </span>
           </button>
+          <input
+            ref={packageInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="sr-only"
+            onChange={(e) => {
+              void handlePackagePhoto(e.target.files?.[0])
+              e.target.value = ''
+            }}
+          />
           <button
             type="button"
-            onClick={() => setCaptureHint('「说话填写」下一版接上。这版请先手填下面的内容。')}
-            className="btn-ghost min-h-14 w-full flex-col gap-0.5 py-3 text-[16px]"
+            onClick={() => void handleVoiceToggle()}
+            disabled={extracting && !listening}
+            className={`btn-ghost min-h-14 w-full flex-col gap-0.5 py-3 text-[16px] disabled:opacity-50 ${
+              listening ? 'ring-2 ring-[var(--color-accent)]' : ''
+            }`}
           >
-            <span>说话填写</span>
-            <span className="text-[12px] font-medium text-muted">少打字 · 即将支持</span>
+            <span>{listening ? '说完了' : '说话填写'}</span>
+            <span className="text-[12px] font-medium text-muted">
+              {listening ? '再点一下结束' : '少打字 · 点一下开始'}
+            </span>
           </button>
         </div>
         {captureHint && (
@@ -148,6 +335,31 @@ export function ItemFormPage({ item, today, locations, onSave, onDelete, onCance
             {captureHint}
           </p>
         )}
+        <div className="flex flex-col gap-2 rounded-[var(--radius-card)] bg-surface px-4 py-3 shadow-[var(--shadow-soft)]">
+          <span className="text-[15px] font-bold">
+            粘贴文字试填{' '}
+            <span className="font-medium text-muted">拍照/说话认出的字也会出现在这里，可改再填</span>
+          </span>
+          <textarea
+            className="field-input min-h-24"
+            value={draftText}
+            onChange={(e) => setDraftText(e.target.value)}
+            placeholder="例如：布洛芬，放客厅药箱，保质期到 2027 年 6 月，退烧用"
+          />
+          <button
+            type="button"
+            onClick={() => void handleExtractFromText()}
+            disabled={extracting || !draftText.trim()}
+            className="btn-ghost w-full disabled:opacity-50"
+          >
+            {extracting ? '正在分析…' : '识别并填入空格'}
+          </button>
+          {extractStatus && (
+            <p className="text-[14px] font-medium text-accent-deep" role="status">
+              {extractStatus}
+            </p>
+          )}
+        </div>
       </div>
 
       <Field label="名称">
@@ -161,6 +373,50 @@ export function ItemFormPage({ item, today, locations, onSave, onDelete, onCance
       </Field>
 
       <div className="flex flex-col gap-2">
+        <span className="text-[15px] font-bold">
+          外观照片 <span className="font-medium text-muted">选填</span>
+        </span>
+        {form.photo ? (
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setPhotoPreviewOpen(true)}
+              className="block w-full overflow-hidden rounded-[var(--radius-card)] shadow-[var(--shadow-soft)]"
+              aria-label="预览完整照片"
+            >
+              <img src={form.photo} alt="" className="h-44 w-full object-cover" />
+            </button>
+            <button
+              type="button"
+              onClick={() => set('photo', null)}
+              className="btn-ghost absolute top-3 right-3 bg-white/95 px-3 text-[14px]"
+            >
+              去掉照片
+            </button>
+            <PhotoPreview
+              src={form.photo}
+              open={photoPreviewOpen}
+              onClose={() => setPhotoPreviewOpen(false)}
+            />
+          </div>
+        ) : (
+          <label className="grid min-h-32 place-items-center rounded-[var(--radius-card)] border border-dashed border-line bg-bg px-4 text-center text-[16px] font-bold text-muted">
+            点这里拍照或选一张图
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="sr-only"
+              onChange={(e) => {
+                void handlePhoto(e.target.files?.[0])
+                e.target.value = ''
+              }}
+            />
+          </label>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-2">
         <Field label="过期日期" hint="不过期的可以不填">
           <input
             type="date"
@@ -169,43 +425,59 @@ export function ItemFormPage({ item, today, locations, onSave, onDelete, onCance
             onChange={(e) => set('expiryDate', e.target.value || null)}
           />
         </Field>
-        <div className="flex flex-wrap gap-2">
-          <span className="self-center text-[13px] font-medium text-muted">从今天起算：</span>
-          {QUICK_SPANS.map(({ label, months }) => (
-            <button
-              key={label}
-              type="button"
-              onClick={() => set('expiryDate', addMonths(today, months))}
-              className="touch-chip bg-surface text-[13px] ring-1 ring-line"
-            >
-              {label}
-            </button>
-          ))}
-          {form.expiryDate && (
-            <button type="button" onClick={() => set('expiryDate', null)} className="touch-chip text-[13px] text-muted underline ring-0">
-              清空
-            </button>
-          )}
-        </div>
+        {form.expiryDate && (
+          <button
+            type="button"
+            onClick={() => set('expiryDate', null)}
+            className="self-start text-[13px] font-medium text-muted underline"
+          >
+            清空过期日期
+          </button>
+        )}
         <div className="flex items-center gap-2 text-[15px] font-medium text-muted">
           现在的状态：<ExpiryBadge info={info} />
         </div>
       </div>
 
-      <Field label="放在哪" hint="选填">
-        <input
-          className="field-input"
-          value={form.location}
-          onChange={(e) => set('location', e.target.value)}
-          placeholder="例如：客厅-电视柜左边抽屉"
-          list="location-options"
+      <div className="flex flex-col gap-2">
+        <span className="text-[15px] font-bold">
+          放在哪 <span className="ml-1.5 font-medium text-muted">选填，可点图或新建</span>
+        </span>
+        <PlacePicker
+          places={placeList}
+          value={form.placeId}
+          onChange={(place) => {
+            setForm((f) => ({
+              ...f,
+              placeId: place?.id ?? null,
+              location: place?.label ?? '',
+            }))
+          }}
+          onCreate={async (input) => {
+            const place = await onCreatePlace(input)
+            setPlaceList((list) =>
+              [...list.filter((p) => p.id !== place.id), place].sort((a, b) =>
+                a.label.localeCompare(b.label, 'zh'),
+              ),
+            )
+            return place
+          }}
         />
+        {!form.placeId && (
+          <input
+            className="field-input"
+            value={form.location}
+            onChange={(e) => set('location', e.target.value)}
+            placeholder="或直接打字：客厅-电视柜左边抽屉"
+            list="location-options"
+          />
+        )}
         <datalist id="location-options">
           {locations.map((l) => (
             <option key={l} value={l} />
           ))}
         </datalist>
-      </Field>
+      </div>
 
       <div className="flex flex-col gap-2">
         <span className="text-[15px] font-bold">类别</span>
@@ -272,42 +544,6 @@ export function ItemFormPage({ item, today, locations, onSave, onDelete, onCance
             <Field label="备注" hint="选填">
               <textarea className="field-input min-h-16" value={form.note} onChange={(e) => set('note', e.target.value)} />
             </Field>
-
-            <div className="flex flex-col gap-2">
-              <span className="text-[15px] font-bold">
-                外观照片 <span className="font-medium text-muted">选填</span>
-              </span>
-              {form.photo ? (
-                <div className="relative">
-                  <img
-                    src={form.photo}
-                    alt=""
-                    className="h-44 w-full rounded-[var(--radius-card)] object-cover shadow-[var(--shadow-soft)]"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => set('photo', null)}
-                    className="btn-ghost absolute top-3 right-3 bg-white/95 px-3 text-[14px]"
-                  >
-                    去掉照片
-                  </button>
-                </div>
-              ) : (
-                <label className="grid min-h-32 place-items-center rounded-[var(--radius-card)] border border-dashed border-line bg-bg px-4 text-center text-[16px] font-bold text-muted">
-                  点这里拍照或选一张图
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    className="sr-only"
-                    onChange={(e) => {
-                      handlePhoto(e.target.files?.[0])
-                      e.target.value = ''
-                    }}
-                  />
-                </label>
-              )}
-            </div>
           </div>
         )}
       </div>

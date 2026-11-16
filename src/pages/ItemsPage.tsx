@@ -2,9 +2,10 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { ItemCard } from '../components/ItemCard'
 import { Legend } from '../components/Legend'
 import { ShibaMascot } from '../components/ShibaMascot'
-import { TextScaleSlider } from '../components/TextScaleSlider'
 import { CATEGORIES } from '../lib/categories'
 import { LEVELS, daysUntil, getExpiryInfo, levelSwatch, type ExpiryLevel } from '../lib/expiry'
+import type { Place } from '../lib/places'
+import { cycleTextScale } from '../lib/textScale'
 import type { Item } from '../lib/types'
 
 interface Props {
@@ -12,6 +13,7 @@ interface Props {
   today: string
   loading: boolean
   error: string | null
+  placesById?: Record<string, Place>
   memberNames?: Record<string, string>
   householdName?: string
   headerAction?: ReactNode
@@ -63,6 +65,7 @@ export function ItemsPage({
   today,
   loading,
   error,
+  placesById,
   memberNames,
   householdName,
   headerAction,
@@ -102,8 +105,8 @@ export function ItemsPage({
   return (
     <div className="relative z-10 mx-auto min-h-dvh w-full max-w-xl px-4 pb-[calc(168px+env(safe-area-inset-bottom))]">
       <header className="sticky top-0 z-20 -mx-4 bg-bg/95 px-4 pt-[calc(12px+env(safe-area-inset-top))] pb-3 backdrop-blur">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2.5">
+        <div className="flex items-center gap-2">
+          <div className="flex min-w-0 shrink items-center gap-2.5">
             <ShibaMascot />
             <div className="min-w-0">
               <p className="text-[13px] font-bold tracking-wide text-accent-deep">全家的物品小本子 · 小六守门</p>
@@ -113,7 +116,17 @@ export function ItemsPage({
               </p>
             </div>
           </div>
-          {headerAction}
+          {/* 夹在标题与用户名之间的空白正中；反缩放避免整页 zoom 把它挤偏 */}
+          <div className="flex min-w-0 flex-1 items-center justify-center px-1">
+            <button
+              type="button"
+              onClick={() => cycleTextScale()}
+              className="text-scale-anchor min-h-11 px-2 text-[14px] font-medium text-muted underline-offset-2 hover:underline"
+            >
+              字体大小
+            </button>
+          </div>
+          {headerAction ? <div className="shrink-0">{headerAction}</div> : null}
         </div>
         {householdName && onOpenHouseholdSwitcher && (
           <button
@@ -131,7 +144,7 @@ export function ItemsPage({
 
       {notice}
 
-      <div className="mb-3">
+      <div className="mb-1.5">
         <Legend />
       </div>
 
@@ -224,6 +237,7 @@ export function ItemsPage({
               <ItemCard
                 item={item}
                 today={today}
+                placesById={placesById}
                 addedBy={item.createdBy ? memberNames?.[item.createdBy] : undefined}
                 onClick={() => onEdit(item)}
               />
@@ -232,14 +246,13 @@ export function ItemsPage({
         </ul>
       )}
 
-      {/* 字号滑杆在「记一件」上方；左侧仍留给音乐控件 */}
+      {/* 左侧留给音乐控件 */}
       <div className="fixed inset-x-0 bottom-0 z-20 px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-2">
-        <div className="mx-auto flex max-w-xl flex-col gap-3">
-          <TextScaleSlider />
+        <div className="mx-auto flex max-w-xl justify-center">
           <button
             type="button"
             onClick={onAdd}
-            className="btn-primary mx-auto px-8 text-[18px] shadow-[var(--shadow-soft)]"
+            className="btn-primary px-8 text-[18px] shadow-[var(--shadow-soft)]"
           >
             + 记一件
           </button>

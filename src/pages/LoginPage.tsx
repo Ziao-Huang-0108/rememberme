@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState, type FormEvent } from 'react'
 import { matchRememberedUsernames } from '../lib/rememberedUsernames'
+import { cycleTextScale } from '../lib/textScale'
 
 interface Props {
   usernameHint?: string
@@ -37,7 +38,7 @@ export function LoginPage({ usernameHint = '', error, onSignIn }: Props) {
   }
 
   return (
-    <div className="relative z-10 mx-auto flex min-h-dvh w-full max-w-xl flex-col justify-center gap-6 px-4 pb-[calc(88px+env(safe-area-inset-bottom))] pt-[calc(16px+env(safe-area-inset-top))]">
+    <div className="relative z-10 mx-auto flex min-h-dvh w-full max-w-xl flex-col justify-center gap-6 px-4 pb-[calc(24px+env(safe-area-inset-bottom))] pt-[calc(16px+env(safe-area-inset-top))]">
       <div className="flex items-center gap-3">
         <img src="/shiba.png" alt="小六" className="h-20 w-20 object-contain" />
         <div>
@@ -114,6 +115,16 @@ export function LoginPage({ usernameHint = '', error, onSignIn }: Props) {
           <p className="mt-4 rounded-[var(--radius-card)] bg-red-50 px-4 py-3 text-[15px] font-medium text-red-700">{localError || error}</p>
         )}
       </section>
+
+      <div className="mt-auto flex w-full flex-col items-center pt-4">
+        <button
+          type="button"
+          onClick={() => cycleTextScale()}
+          className="text-scale-anchor min-h-11 px-3 text-[15px] font-medium text-muted underline-offset-2 hover:underline"
+        >
+          字体大小
+        </button>
+      </div>
     </div>
   )
 }
